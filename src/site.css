@@ -245,3 +245,15 @@ button.button:disabled { cursor: default; opacity: .66; }
   .header-tools { gap: .25rem; }
   .cart-link { padding-inline: .55rem; }
 }
+.floating-cart { position: fixed; z-index: 6; inset-inline-end: var(--gutter); bottom: max(1rem, env(safe-area-inset-bottom)); display: flex; align-items: center; gap: .65rem; padding: .62rem .85rem; min-height: 3rem; border: 1px solid #9aac97; border-radius: .35rem; background: var(--green); color: var(--cream); text-decoration: none; font-weight: 700; box-shadow: 0 .3rem 1rem #112b2340; }
+.floating-cart:hover { background: #285142; }
+.floating-cart:focus-visible { outline-color: var(--clay); }
+.floating-cart-count { margin-inline-start: auto; padding: .13rem .45rem; border-radius: .2rem; background: var(--cream); color: var(--green); font-size: .86rem; white-space: nowrap; }
+.has-floating-cart { padding-bottom: calc(4.25rem + env(safe-area-inset-bottom)); }
+.has-floating-cart .cart-feedback:not(:empty) { bottom: calc(max(1rem, env(safe-area-inset-bottom)) + 3.55rem); }
+.reservation-pickup-note { max-width: 48ch; margin-bottom: .65rem; color: var(--muted); font-size: .9rem; }
+.pickup-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .25rem .75rem; }
+.pickup-actions .button { margin-top: .25rem; text-align: left; }
+@media (max-width: 36rem) {
+  .floating-cart { inset-inline: var(--gutter); }
+}

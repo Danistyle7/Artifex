@@ -2,7 +2,7 @@ import { categories } from './catalog.mjs';
 import { escapeHtml, imageAddress } from './catalog-view.mjs';
 import { availabilityLabel, boliviaDate, formatBs, formatPickupDate, newDemoId } from './reservation-data.mjs';
 import { draftKey, initialCatalog, readDemo, storageKey, updateDemo } from './reservation-store.js';
-import { exampleOrders, filterOrders, futureDays, normalizeSearch, ordersOn, paginate, panesIn, production, shiftDate, sortedOrders, statuses, summary } from './admin-data.mjs';
+import { exampleOrders, filterOrders, nearestOrderDate, normalizeSearch, ordersOn, paginate, panesIn, pickupAgenda, production, shiftDate, statuses, summary } from './admin-data.mjs';
 
 const find = selector => document.querySelector(selector);
 const all = selector => [...document.querySelectorAll(selector)];
@@ -25,6 +25,9 @@ const actionDialog = find('#action-dialog');
 const productForm = find('[data-product-form]');
 const stateForm = find('[data-order-state]');
 const dayFields = all('[data-product-form] [name="days"]');
+const imageFile = find('[data-image-file]');
+const imagePreview = find('[data-image-preview]');
+let imageObjectUrl;
 const nextStatus = { pendiente: 'preparado', preparado: 'entregado' };
 const quickLabel = { preparado: 'Marcar preparado', entregado: 'Marcar entregado' };
 let state;
@@ -73,38 +76,39 @@ function timingLabel(date, today) {
   return date > today ? 'Programado' : '';
 }
 
+const describeDate = (date, today) => `${date === today ? 'Hoy · ' : ''}${formatPickupDate(date)}`;
+
 function renderSummary() {
   const today = boliviaDate();
   const values = summary(ordersOn(state.reservations, selectedDate));
-  find('[data-day-description]').textContent = `${selectedDate === today ? 'Hoy · ' : ''}${formatPickupDate(selectedDate)}`;
+  find('[data-day-description]').textContent = describeDate(selectedDate, today);
   find('[data-metrics]').innerHTML = metrics([
-    ['Total de reservas', values.orders], ['Pendientes', values.pending], ['Preparados', values.prepared],
-    ['Entregados', values.delivered], ['Cancelados', values.cancelled],
+    ['Reservas', values.orders], ['Por preparar', values.pending], ['Listos para recoger', values.prepared], ['Panes reservados', values.quantity],
   ]);
-  find('[data-value-metrics]').innerHTML = metrics([
-    ['Panes en pedidos no cancelados', values.quantity], ['Valor de reservas sin cancelar', formatBs(values.reservedValue)],
-    ['Valor de pedidos entregados', formatBs(values.deliveredValue)],
-  ]);
-  const needsAttention = sortedOrders(state.reservations).filter(order => nextStatus[order.status] &&
-    (selectedDate < today ? order.pickup.date === selectedDate : order.pickup.date >= selectedDate)).slice(0, 5);
-  find('[data-upcoming]').innerHTML = needsAttention.length
-    ? `<ul class="admin-upcoming">${needsAttention.map(order => `<li>
-      <div><strong>${escapeHtml(order.customer.name)}</strong><small>${escapeHtml(order.code)} · ${escapeHtml(formatPickupDate(order.pickup.date))}</small>
-      <small>${escapeHtml(order.pickup.slot)} · ${panesIn(order)} panes</small></div>
-      <div class="admin-upcoming-action">${badge(order.status)}${orderButton(order.id)}</div>
-    </li>`).join('')}</ul>`
-    : empty('Sin recojos pendientes', 'Los pedidos pendientes y preparados aparecerán aquí.');
-  const future = futureDays(state.reservations, today).slice(0, 5);
-  find('[data-future-days]').innerHTML = future.length
-    ? `<ul class="admin-future">${future.map(({ date, orders, panes }) => `<li>
-      <strong>${escapeHtml(formatPickupDate(date))}</strong>
-      <p class="admin-meta">${orders} ${orders === 1 ? 'reserva' : 'reservas'} · ${panes} ${panes === 1 ? 'pan' : 'panes'}</p>
-      <div class="admin-row-actions">
-        <button class="text-link link-button" type="button" data-view-orders="${date}">Ver pedidos</button>
-        <button class="text-link link-button" type="button" data-view-production="${date}">Ver producción</button>
-      </div>
-    </li>`).join('')}</ul>`
-    : empty('Sin reservas futuras', 'Los días con reservas se mostrarán aquí.');
+  find('[data-value-metrics]').innerHTML = `<dl class="admin-summary-details">
+    <div><dt>Entregados</dt><dd>${values.delivered}</dd></div>
+    <div><dt>Cancelados</dt><dd>${values.cancelled}</dd></div>
+    <div><dt>Valor de reservas vigentes</dt><dd>${formatBs(values.reservedValue)}</dd></div>
+    <div><dt>Valor de pedidos entregados</dt><dd>${formatBs(values.deliveredValue)}</dd></div>
+  </dl><p class="admin-meta">Importes referenciales de la demo.</p>`;
+
+  const agenda = pickupAgenda(state.reservations, today).slice(0, 4);
+  find('[data-agenda]').innerHTML = agenda.length
+    ? `<div class="agenda-list">${agenda.map(({ date, orders, panes }) => `<article class="agenda-day">
+      <header class="agenda-day-header">
+        <div><h3><time datetime="${date}">${escapeHtml(describeDate(date, today))}</time></h3>
+          <p>${orders.length} ${orders.length === 1 ? 'pedido' : 'pedidos'} por recoger · ${panes} ${panes === 1 ? 'pan' : 'panes'}</p></div>
+        <div class="admin-row-actions">
+          <button class="text-link link-button" type="button" data-view-orders="${date}">Ver pedidos</button>
+          <button class="text-link link-button" type="button" data-view-production="${date}">Ver producción</button>
+        </div>
+      </header>
+      <ul class="admin-upcoming">${orders.slice(0, 3).map(order => `<li>
+        <div><strong>${escapeHtml(order.customer.name)}</strong><small>${escapeHtml(order.code)} · ${escapeHtml(order.pickup.slot)} · ${panesIn(order)} panes</small></div>
+        <div class="admin-upcoming-action">${badge(order.status)}${orderButton(order.id)}</div>
+      </li>`).join('')}</ul>
+    </article>`).join('')}</div>`
+    : empty('Sin recojos por atender', 'Cuando haya pedidos pendientes o listos para recoger, aparecerán aquí.');
 }
 
 function orderActions(order) {
@@ -169,7 +173,8 @@ function renderOrders() {
 
 function renderProduction() {
   const today = boliviaDate();
-  find('[data-production-date="next"]').disabled = !futureDays(state.reservations, today).length;
+  find('[data-production-description]').textContent = describeDate(selectedDate, today);
+  find('[data-production-date="next"]').disabled = !nearestOrderDate(state.reservations, shiftDate(today, 1));
   const plan = production(ordersOn(state.reservations, selectedDate));
   find('[data-production-metrics]').innerHTML = metrics([
     ['Pedidos', plan.orders], ['Panes reservados', plan.units], ['Productos diferentes', plan.products], ['Pedidos por entregar', plan.toDeliver],
@@ -252,9 +257,20 @@ function navigate(section) {
   else location.hash = section;
 }
 
+function defaultOrderPeriod() {
+  const today = boliviaDate();
+  const reservations = state?.reservations ?? [];
+  return reservations.some(order => order.pickup.date >= today) || !reservations.length ? 'upcoming' : 'all';
+}
+
+function showInitialDates() {
+  period.value = defaultOrderPeriod();
+  setDate(nearestOrderDate(state.reservations, boliviaDate(), true));
+}
+
 function clearOrderFilters() {
   for (const field of [orderDate, fromDate, toDate, orderStatus, search]) field.value = '';
-  period.value = 'today';
+  period.value = defaultOrderPeriod();
   page = 1;
   relatedProduct = undefined;
 }
@@ -287,20 +303,47 @@ function showOrder(order) {
     <p class="booking-total"><span>Total al reservar</span><strong>${formatBs(order.total)}</strong></p>`;
 }
 
+function chosenDays() {
+  return productForm.elements.pickupMode.value === 'all'
+    ? 'all'
+    : dayFields.filter(input => input.checked).map(input => Number(input.value));
+}
+
 function syncDays() {
-  dayFields.forEach(input => { input.disabled = productForm.elements.everyDay.checked; });
+  const days = chosenDays();
+  find('[data-day-choices]').hidden = days === 'all';
+  dayFields.forEach(input => { input.disabled = days === 'all'; });
+  find('[data-pickup-label]').textContent = days === 'all'
+    ? 'Disponible cada día en que haya recojos.'
+    : days.length ? `Disponible: ${availabilityLabel({ pickupDays: days })}.` : 'Selecciona al menos un día.';
+}
+
+function showImage(url) {
+  imagePreview.hidden = !url;
+  if (url) imagePreview.src = url;
+  else imagePreview.removeAttribute('src');
+}
+
+function clearImagePreview() {
+  if (imageObjectUrl) URL.revokeObjectURL(imageObjectUrl);
+  imageObjectUrl = undefined;
+  imageFile.value = '';
+  showImage('');
+  find('[data-image-status]').textContent = '';
 }
 
 function showProduct(product) {
   selectedProduct = product?.slug;
   productForm.reset();
+  clearImagePreview();
+  showImage(imageAddress(product?.imageUrl, root));
   find('#product-editor-title').textContent = product ? 'Editar producto' : 'Crear producto';
   showError('[data-product-error]');
   if (product) {
-    for (const field of ['name', 'description', 'price', 'category', 'imageUrl', 'active']) {
+    for (const field of ['name', 'description', 'price', 'category', 'active']) {
       productForm.elements.namedItem(field).value = product[field];
     }
-    productForm.elements.everyDay.checked = product.pickupDays === 'all';
+    productForm.elements.pickupMode.value = product.pickupDays === 'all' ? 'all' : 'specific';
     if (Array.isArray(product.pickupDays)) {
       dayFields.forEach(input => { input.checked = product.pickupDays.includes(Number(input.value)); });
     }
@@ -508,7 +551,7 @@ find('[data-orders]').addEventListener('click', event => {
 for (const button of all('[data-production-date]')) button.addEventListener('click', () => {
   const today = boliviaDate();
   const mode = button.dataset.productionDate;
-  const date = mode === 'today' ? today : mode === 'tomorrow' ? shiftDate(today, 1) : futureDays(state.reservations, today)[0]?.date;
+  const date = mode === 'today' ? today : mode === 'tomorrow' ? shiftDate(today, 1) : nearestOrderDate(state.reservations, shiftDate(today, 1));
   if (date) setDate(date);
 });
 find('[data-open-production-orders]').addEventListener('click', () => openOrders(selectedDate));
@@ -528,7 +571,27 @@ window.addEventListener('storage', event => {
 });
 
 find('[data-close-product]').addEventListener('click', () => productDialog.close());
-productForm.elements.everyDay.addEventListener('change', syncDays);
+for (const input of all('[data-product-form] [name="pickupMode"], [data-product-form] [name="days"]')) {
+  input.addEventListener('change', syncDays);
+}
+find('[data-pick-image]').addEventListener('click', () => imageFile.click());
+imageFile.addEventListener('change', () => {
+  const file = imageFile.files?.[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    find('[data-image-status]').textContent = 'Elige un archivo de imagen.';
+    return;
+  }
+  if (imageObjectUrl) URL.revokeObjectURL(imageObjectUrl);
+  imageObjectUrl = URL.createObjectURL(file);
+  showImage(imageObjectUrl);
+  find('[data-image-status]').textContent = `Vista previa de ${file.name}.`;
+});
+imagePreview.addEventListener('error', () => {
+  imagePreview.hidden = true;
+  if (imageObjectUrl) find('[data-image-status]').textContent = 'Esta imagen no se puede previsualizar.';
+});
+productDialog.addEventListener('close', clearImagePreview);
 productForm.addEventListener('submit', async event => {
   event.preventDefault();
   const button = event.submitter;
@@ -536,15 +599,13 @@ productForm.addEventListener('submit', async event => {
   const fields = new FormData(productForm);
   const name = fields.get('name').trim();
   const description = fields.get('description').trim();
-  const imageUrl = fields.get('imageUrl').trim();
   const price = productForm.elements.price.valueAsNumber;
   const category = fields.get('category');
-  const pickupDays = fields.has('everyDay') ? 'all' : fields.getAll('days').map(Number);
+  const pickupDays = chosenDays();
   let error = '';
   if (!name || !description) error = 'Escribe el nombre y la descripción del pan.';
   else if (!Number.isFinite(price) || price < 0 || !Object.hasOwn(categories, category)) error = 'Revisa el precio y la categoría.';
   else if (!pickupDays.length) error = 'Selecciona al menos un día de recojo.';
-  else if (imageUrl && !imageAddress(imageUrl, root)) error = 'Usa una ruta local o una URL HTTPS válida.';
   showError('[data-product-error]', error);
   if (error) return;
 
@@ -552,14 +613,13 @@ productForm.addEventListener('submit', async event => {
   const slug = selectedProduct;
   try {
     await updateDemo(data => {
-      const values = { name, description, price, category, imageUrl, pickupDays, active: fields.get('active') === 'true' };
+      const values = { name, description, price, category, pickupDays, active: fields.get('active') === 'true' };
       if (slug) {
         const product = data.catalog.find(item => item.slug === slug);
         if (!product) throw new Error('Producto inexistente');
-        if (product.imageUrl !== imageUrl) delete product.alt;
         Object.assign(product, values);
       } else {
-        data.catalog.push({ slug: `pan-${newDemoId()}`, ...values });
+        data.catalog.push({ slug: `pan-${newDemoId()}`, imageUrl: '', ...values });
       }
     });
     refresh();
@@ -593,7 +653,7 @@ find('[data-confirm-reset]').addEventListener('click', async event => {
     ordersView = 'work';
     for (const field of [productSearch, productCategory, productStatus]) field.value = '';
     refresh();
-    setDate();
+    showInitialDates();
     resetDialog.close();
     message('Demostración restablecida.');
   } catch {
@@ -614,7 +674,7 @@ try {
     });
     state = readDemo();
   }
-  setDate();
+  showInitialDates();
 } catch {
   showError('[data-error]', 'No se pudo cargar la demostración. Revisa el almacenamiento local.');
 }

@@ -25,6 +25,7 @@ function checkout(container) {
   const formPanel = find('[data-form-panel]');
   const lines = find('[data-cart-items]');
   const incompatible = find('[data-incompatible]');
+  const suggestion = find('[data-suggest-date]');
   const storageError = find('[data-storage-error]');
   const lastReservation = find('[data-last-reservation]');
   const requiredFields = [date, slot, form.elements.customerName, form.elements.phone];
@@ -51,27 +52,43 @@ function checkout(container) {
 
   function setError(field, message = '') {
     field.setAttribute('aria-invalid', String(Boolean(message)));
-    document.getElementById(field.getAttribute('aria-describedby')).textContent = message;
+    document.getElementById(`error-${field.id}`).textContent = message;
   }
 
   function checkPickup() {
     const selected = dates.find(option => option.date === date.value);
-    replaceOptions(slot, 'Elige una franja', (selected?.slots ?? []).map(hour => new Option(hour, hour)));
+    replaceOptions(slot, 'Elige una hora', (selected?.slots ?? []).map(hour => new Option(hour, hour)));
     slot.disabled = !selected;
     const conflicts = unavailableItems(items, selected);
     const inactive = conflicts.filter(({ product }) => !product.active);
-    incompatible.hidden = conflicts.length === 0;
+    const compatibleDates = dates.filter(option => unavailableItems(items, option).length === 0);
+    const compatible = compatibleDates.find(option => !selected || option.date >= selected.date) ?? compatibleDates.at(-1);
+    const noCommonDate = items.length > 0 && !compatible;
+    incompatible.hidden = !conflicts.length && !noCommonDate;
     const names = (inactive.length ? inactive : conflicts).map(({ product }) => product.name).join(', ');
     find('[data-incompatible-message]').textContent = inactive.length
       ? `${names}: ya no está disponible para reservar. Retíralo del carrito para continuar.`
-      : conflicts.length ? `${names}: sin disponibilidad para esta fecha. Cambia la fecha o edita el carrito.` : '';
-    submit.disabled = submitting || conflicts.length > 0;
+      : noCommonDate
+        ? 'No hay una fecha próxima en la que estén disponibles todos tus panes. Puedes editar tu carrito.'
+        : conflicts.length ? `Para esta fecha faltaría: ${names}. Puedes elegir otro día o editar tu carrito.` : '';
+    const alternative = conflicts.length && compatible && compatible.date !== selected?.date ? compatible : null;
+    suggestion.hidden = !alternative;
+    suggestion.dataset.date = alternative?.date ?? '';
+    suggestion.textContent = alternative ? `Elegir ${alternative.label}` : '';
+    submit.disabled = submitting || noCommonDate || conflicts.length > 0;
+  }
+
+  function showDateOptions() {
+    replaceOptions(date, 'Elige una fecha', dates.map(option => {
+      const label = unavailableItems(items, option).length ? `${option.label} · no están todos tus panes` : option.label;
+      return new Option(label, option.date);
+    }));
+    checkPickup();
   }
 
   function refreshDates() {
     dates = pickupDates();
-    replaceOptions(date, 'Elige una fecha', dates.map(option => new Option(option.label, option.date)));
-    checkPickup();
+    showDateOptions();
   }
 
   function saveDraft() {
@@ -133,7 +150,7 @@ function checkout(container) {
     const total = formatBs(cartTotal(items));
     find('[data-subtotal]').textContent = total;
     find('[data-total]').textContent = total;
-    checkPickup();
+    showDateOptions();
   }
 
   lines.addEventListener('click', async event => {
@@ -167,6 +184,12 @@ function checkout(container) {
     showStep('form');
   });
   container.querySelectorAll('[data-edit]').forEach(button => button.addEventListener('click', () => showStep('cart')));
+  suggestion.addEventListener('click', () => {
+    if (!suggestion.dataset.date) return;
+    date.value = suggestion.dataset.date;
+    date.dispatchEvent(new Event('change'));
+    slot.focus();
+  });
   date.addEventListener('change', () => {
     slot.value = '';
     setError(date);
@@ -190,7 +213,7 @@ function checkout(container) {
     const notes = form.elements.notes.value.trim();
     const errors = [
       selected ? '' : 'Selecciona una fecha de recojo habilitada.',
-      selected?.slots.includes(selectedSlot) ? '' : 'Selecciona una franja disponible para la fecha.',
+      selected?.slots.includes(selectedSlot) ? '' : 'Elige una hora de recojo para esa fecha.',
       name ? '' : 'Ingresa tu nombre.',
       phone ? '' : 'Ingresa un celular boliviano de 8 dígitos. Puedes incluir +591.',
     ];
@@ -213,7 +236,7 @@ function checkout(container) {
         }
         const currentDate = pickupDates().find(option => option.date === selected.date);
         if (!currentDate?.slots.includes(selectedSlot) || unavailableItems(current, currentDate).length) {
-          throw new CheckoutError('La fecha o la franja ya no coincide con tu selección. Elige otra opción.');
+          throw new CheckoutError('La fecha o la hora ya no está disponible para tu selección. Elige otra opción.');
         }
 
         const id = newDemoId();

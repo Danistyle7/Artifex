@@ -20,7 +20,7 @@ El catálogo se edita en `src/catalog.mjs`. Las páginas y sus componentes compa
 ## Probar una reserva
 
 1. Desde el catálogo, agrega una baguette. Abre la ficha del pan de sésamo y agrega dos unidades. El carrito mostrará Bs 79,00.
-2. Continúa al recojo y elige un viernes para comprobar el aviso de incompatibilidad. Cambia a un sábado y elige una franja.
+2. Pulsa Continuar con la reserva y elige un viernes para comprobar el aviso. Usa la fecha sugerida y elige una hora de recojo.
 3. Completa el nombre y un número ficticio con formato boliviano. Confirma y recarga la confirmación para verificar que el código y el resumen se conservan. Desde el carrito también puedes volver a tu última reserva.
 
 Los días y las franjas se editan en `src/reservation-data.mjs`. Las fechas de recojo se calculan a partir del día siguiente en la zona `America/La_Paz`. Los precios y los días habilitados de cada pan se editan en `src/catalog.mjs`, donde `pickupDays` admite `'all'` o una lista de días de la semana de 0 (domingo) a 6 (sábado). El formulario comprueba el formato de los móviles bolivianos y admite el prefijo `+591`. [Plan de numeración de la ATT](https://w2.att.gob.bo/sites/default/files/archivos_listados_pdf/2025-09-18/29.%20APROBAR%20EL%20PLAN%20T%C3%89CNICO%20FUNDAMENTAL%20DE%20NUMERACI%C3%93N.pdf)
@@ -35,10 +35,10 @@ Las reservas se guardan en el navegador y se pierden al borrar los datos del sit
 
 Abre [el panel local](http://127.0.0.1:4173/admin/) desde la misma dirección y el mismo navegador que usas para el catálogo. El icono de usuario del encabezado abre el panel. «Ver sitio público» te lleva de vuelta.
 
-- **Inicio** muestra los pedidos que requieren atención, los próximos días y los valores de las reservas y entregas por separado. Los importes son referenciales.
-- **Pedidos** abre en **Operación**, con el filtro de hoy. Puedes combinar período, estado y búsqueda por cliente, código o teléfono. **Historial** muestra los recojos de días anteriores y los pedidos entregados o cancelados, con filtros de rango y páginas de diez registros.
-- **Producción** suma los panes por día y desglosa lo pendiente, lo preparado y lo entregado. Pulsa el nombre de un pan para ver las reservas vigentes que lo incluyen.
-- **Catálogo** permite buscar, filtrar, crear, editar, activar y desactivar productos. Las imágenes guardan solo su ruta o URL.
+- **Inicio** muestra una agenda por fecha con los pedidos por recoger y los valores de las reservas y entregas por separado. Los importes son referenciales.
+- **Pedidos** abre en **Operación**, con los pedidos de hoy y de fechas próximas. Si todos los pedidos son anteriores, abre en Todos. Puedes combinar período, estado y búsqueda por cliente, código o teléfono. **Historial** muestra los recojos de días anteriores y los pedidos entregados o cancelados, con filtros de rango y páginas de diez registros.
+- **Producción** abre en la fecha con pedidos vigentes más próxima y suma los panes por día y desglosa lo pendiente, lo preparado y lo entregado. Pulsa el nombre de un pan para ver las reservas vigentes que lo incluyen.
+- **Catálogo** permite buscar, filtrar, crear, editar, activar y desactivar productos. El botón Subir imagen muestra una vista previa temporal. Las fotos que ya tiene el catálogo se conservan.
 
 ### Probar el recorrido completo
 

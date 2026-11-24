@@ -32,17 +32,12 @@ export function adminPage() {
             <div class="admin-lead"><div><h1>Inicio</h1><p class="admin-meta" data-day-description></p></div>
               ${dateInput('summary-date', 'Fecha del resumen')}</div>
             <div class="admin-metrics admin-metrics-status" data-metrics></div>
-            <div class="admin-metrics admin-metrics-value" data-value-metrics></div>
-            <div class="admin-home-grid">
-              <section class="admin-block" aria-labelledby="upcoming-heading">
-                <div class="admin-subhead"><h2 id="upcoming-heading">Próximos recojos</h2><a class="text-link" href="#pedidos">Ir a Pedidos</a></div>
-                <div data-upcoming></div>
-              </section>
-              <section class="admin-block" aria-labelledby="future-heading">
-                <div class="admin-subhead"><h2 id="future-heading">Próximos días</h2></div>
-                <div data-future-days></div>
-              </section>
-            </div>
+            <div class="admin-summary-values" data-value-metrics></div>
+            <section class="admin-block admin-agenda" aria-labelledby="agenda-heading">
+              <div class="admin-subhead"><h2 id="agenda-heading">Agenda de recojos</h2><a class="text-link" href="#pedidos">Ir a Pedidos</a></div>
+              <p class="admin-meta">Pedidos pendientes y listos para recoger, agrupados por fecha.</p>
+              <div data-agenda></div>
+            </section>
           </section>
           <section data-panel="pedidos" hidden>
             <div class="admin-lead"><h1>Pedidos</h1></div>
@@ -54,6 +49,7 @@ export function adminPage() {
             <div class="admin-filters admin-order-filters">
               <label class="admin-field" for="order-search">Buscar cliente, código o teléfono<input type="search" id="order-search"></label>
               <label class="admin-field" for="order-period" data-period-field>Período<select id="order-period">
+                <option value="upcoming">Hoy y próximos días</option>
                 <option value="today">Hoy</option><option value="tomorrow">Mañana</option><option value="week">Próximos 7 días</option>
                 <option value="date">Fecha específica</option><option value="range">Rango de fechas</option><option value="all">Todos</option>
               </select></label>
@@ -79,7 +75,7 @@ export function adminPage() {
             </nav>
           </section>
           <section data-panel="produccion" hidden>
-            <div class="admin-lead"><h1>Producción</h1>${dateInput('production-date', 'Fecha de producción')}</div>
+            <div class="admin-lead"><div><h1>Producción</h1><p class="admin-meta" data-production-description></p></div>${dateInput('production-date', 'Fecha de producción')}</div>
             <div class="admin-quick-dates" role="group" aria-label="Fechas rápidas de producción">
               <button type="button" class="button button-add" data-production-date="today">Hoy</button>
               <button type="button" class="button button-add" data-production-date="tomorrow">Mañana</button>
@@ -148,14 +144,32 @@ export function adminPage() {
           <fieldset class="admin-editor-group"><legend>Precio e imagen</legend>
             <div class="admin-editor">
               <label class="admin-field">Precio en Bs<input name="price" type="number" min="0" max="99999.99" step="0.01" inputmode="decimal" required></label>
-              <label class="admin-field">Ruta o URL de imagen<input name="imageUrl" maxlength="500" placeholder="assets/baguette.jpg"><small>Archivo local existente o dirección HTTPS.</small></label>
+              <div class="admin-field">
+                <span>Imagen del producto</span>
+                <div class="admin-image-picker">
+                  <img alt="Vista previa del producto" data-image-preview hidden>
+                  <button type="button" class="button button-add" data-pick-image>Subir imagen</button>
+                </div>
+                <input type="file" accept="image/*" aria-label="Elegir imagen del producto" data-image-file hidden>
+                <small>Vista previa de demostración. La imagen elegida no se guarda.</small>
+                <small data-image-status role="status"></small>
+              </div>
             </div>
           </fieldset>
           <fieldset class="admin-editor-group admin-days"><legend>Disponibilidad</legend>
-            <div class="admin-editor"><div>
-              <label><input name="everyDay" type="checkbox"> Todos los días de recojo</label>
-              <div>${Object.entries(pickup.weekdays).filter(([, slots]) => slots.length).map(([day]) => `<label><input name="days" type="checkbox" value="${day}"> ${dayNames[day]}</label>`).join('')}</div>
-            </div><label class="admin-field">Estado del producto<select name="active"><option value="true">Activo</option><option value="false">Inactivo</option></select></label></div>
+            <div class="admin-editor">
+              <div>
+                <div class="admin-pickup-options" role="group" aria-label="Días de disponibilidad">
+                  <label><input name="pickupMode" type="radio" value="all" checked> Todos los días de recojo</label>
+                  <label><input name="pickupMode" type="radio" value="specific"> Solo algunos días</label>
+                </div>
+                <div class="admin-day-choices" data-day-choices role="group" aria-label="Elige los días de recojo" hidden>
+                  ${Object.entries(pickup.weekdays).filter(([, slots]) => slots.length).map(([day]) => `<label class="admin-day"><input name="days" type="checkbox" value="${day}"> ${dayNames[day]}</label>`).join('')}
+                </div>
+                <small class="admin-meta" data-pickup-label role="status"></small>
+              </div>
+              <label class="admin-field">Estado del producto<select name="active"><option value="true">Activo</option><option value="false">Inactivo</option></select></label>
+            </div>
           </fieldset>
           <p class="reservation-error" role="alert" data-product-error hidden></p>
           <button class="button button-primary" type="submit">Guardar producto</button>

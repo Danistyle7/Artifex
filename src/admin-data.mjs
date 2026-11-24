@@ -38,6 +38,8 @@ export function filterOrders(orders, filters, today) {
     last = to;
   } else if (period === 'today' || period === 'tomorrow') {
     first = last = period === 'today' ? today : shiftDate(today, 1);
+  } else if (period === 'upcoming') {
+    first = today;
   } else if (period === 'week') {
     first = today;
     last = shiftDate(today, 6);
@@ -46,7 +48,7 @@ export function filterOrders(orders, filters, today) {
     first = last = date;
   }
 
-  return sortedOrders(orders.filter(order => {
+  const matches = orders.filter(order => {
     const day = order.pickup.date;
     const closed = order.status === 'entregado' || order.status === 'cancelado';
     if (history && day >= today && !closed) return false;
@@ -55,7 +57,13 @@ export function filterOrders(orders, filters, today) {
     const phone = (order.customer.phone || '').replace(/\D/gu, '');
     return !search || normalizeSearch(`${order.customer.name} ${order.code}`).includes(search) ||
       Boolean(phoneQuery && phone.includes(phoneQuery));
-  }), history);
+  });
+  if (!history && period === 'all') {
+    const upcoming = matches.filter(order => order.pickup.date >= today);
+    const past = matches.filter(order => order.pickup.date < today);
+    return [...sortedOrders(upcoming), ...sortedOrders(past, true)];
+  }
+  return sortedOrders(matches, history);
 }
 
 export function paginate(items, page, size = orderPageSize) {
@@ -84,17 +92,22 @@ export function summary(orders) {
   };
 }
 
-export function futureDays(orders, today) {
+export function nearestOrderDate(orders, from, includePast = false) {
+  const dates = Array.from(new Set(orders.filter(order => order.status !== 'cancelado').map(order => order.pickup.date))).sort();
+  return dates.find(date => date >= from) ?? (includePast ? dates.at(-1) : undefined);
+}
+
+export function pickupAgenda(orders, today) {
   const days = new Map();
-  for (const order of orders) {
+  for (const order of sortedOrders(orders)) {
     const date = order.pickup.date;
-    if (date <= today || order.status === 'cancelado') continue;
-    const day = days.get(date) ?? { date, orders: 0, panes: 0 };
-    day.orders += 1;
+    if (date < today || (order.status !== 'pendiente' && order.status !== 'preparado')) continue;
+    const day = days.get(date) ?? { date, orders: [], panes: 0 };
+    day.orders.push(order);
     day.panes += panesIn(order);
     days.set(date, day);
   }
-  return Array.from(days.values()).sort((a, b) => a.date.localeCompare(b.date));
+  return Array.from(days.values());
 }
 
 export function production(orders) {

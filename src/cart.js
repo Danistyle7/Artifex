@@ -6,14 +6,22 @@ export const cartChange = 'artifex:cart-change';
 export function initCart() {
   const count = document.querySelector('[data-cart-count]');
   const feedback = document.querySelector('#cart-feedback');
+  const floating = document.querySelector('[data-floating-cart]');
+  const floatingCount = floating?.querySelector('[data-floating-cart-count]');
   let feedbackTimer;
 
   function refreshCount() {
+    let total = 0;
     try {
-      const quantities = Object.values(readDemo().cart);
-      count.textContent = quantities.reduce((total, quantity) => total + quantity, 0);
+      total = Object.values(readDemo().cart).reduce((sum, quantity) => sum + quantity, 0);
     } catch {
-      count.textContent = '0';
+      // Browsing remains possible if the browser blocks storage.
+    }
+    count.textContent = total;
+    if (floating) {
+      floating.hidden = total === 0;
+      floatingCount.textContent = `${total} ${total === 1 ? 'pan' : 'panes'}`;
+      document.body.classList.toggle('has-floating-cart', total > 0);
     }
   }
 

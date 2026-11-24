@@ -66,7 +66,12 @@ export const layout = ({ root, page, title, description, content, customHeader }
   <a class="skip" href="#contenido">Ir al contenido</a>
   ${customHeader || header(root, page)}
   <main id="contenido" tabindex="-1">${content}</main>
-  ${customHeader ? '' : `${footer(root)}<p class="cart-feedback" id="cart-feedback" role="status"></p>`}
+  ${customHeader ? '' : `${footer(root)}
+    ${page === 'carrito' || page === 'confirmacion' ? '' : `<a class="floating-cart" href="${root}reservar/" data-floating-cart hidden>
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.2 10.5h11.3l2-7.5H6M9 20h.01M17 20h.01"/><circle cx="9" cy="20" r=".8"/><circle cx="17" cy="20" r=".8"/></svg>
+      <span>Ver carrito</span><span class="floating-cart-count" data-floating-cart-count></span>
+    </a>`}
+    <p class="cart-feedback" id="cart-feedback" role="status"></p>`}
 </body>
 </html>
 `;

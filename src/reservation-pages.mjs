@@ -22,7 +22,7 @@ export function reservationCheckout() {
         <div data-flow hidden>
           <ol class="reservation-progress" aria-label="Progreso de la reserva">
             <li data-step="cart" aria-current="step">1. Tus panes</li>
-            <li data-step="form">2. Recojo y datos</li>
+            <li data-step="form">2. Completa tu reserva</li>
             <li>3. Confirmación</li>
           </ol>
           <div class="reservation-grid">
@@ -30,30 +30,34 @@ export function reservationCheckout() {
               <h2 id="cart-heading" tabindex="-1">Tus panes</h2>
               <div class="cart-items" data-cart-items></div>
               <div class="actions reservation-actions">
-                <button class="button button-primary" type="button" data-continue>Continuar al recojo</button>
+                <button class="button button-primary" type="button" data-continue>Continuar con la reserva</button>
                 <a class="text-link" href="../panes/">Seguir explorando panes</a>
               </div>
             </section>
             <section aria-labelledby="form-heading" data-form-panel hidden>
-              <h2 id="form-heading" tabindex="-1">Recojo y datos</h2>
+              <h2 id="form-heading" tabindex="-1">Completa tu reserva</h2>
               <form class="reservation-form" novalidate>
                 <fieldset>
-                  <legend>Elige el recojo</legend>
+                  <legend>¿Cuándo recogerás tus panes?</legend>
+                  <p class="reservation-pickup-note" id="pickup-note">Algunos panes solo se preparan ciertos días. Si una fecha no coincide con tu carrito, te sugerimos otra cuando esté disponible.</p>
                   <div class="reservation-fields">
                     <div class="reservation-field">
                       <label for="pickup-date">Fecha de recojo</label>
-                      <select id="pickup-date" name="pickupDate" aria-describedby="error-pickup-date" required></select>
+                      <select id="pickup-date" name="pickupDate" aria-describedby="pickup-note error-pickup-date" required></select>
                       <small class="field-error" id="error-pickup-date"></small>
                     </div>
                     <div class="reservation-field">
-                      <label for="pickup-slot">Franja de recojo</label>
+                      <label for="pickup-slot">Hora de recojo</label>
                       <select id="pickup-slot" name="pickupSlot" aria-describedby="error-pickup-slot" required disabled></select>
                       <small class="field-error" id="error-pickup-slot"></small>
                     </div>
                   </div>
                   <div class="reservation-error" data-incompatible role="status" hidden>
                     <p data-incompatible-message></p>
-                    <button class="text-link link-button" type="button" data-edit>Editar carrito</button>
+                    <div class="pickup-actions">
+                      <button class="button button-add" type="button" data-suggest-date hidden></button>
+                      <button class="text-link link-button" type="button" data-edit>Editar carrito</button>
+                    </div>
                   </div>
                 </fieldset>
                 <fieldset>
@@ -121,7 +125,7 @@ export function reservationConfirmation() {
             <dl class="booking-data">
               <div><dt>Nombre</dt><dd data-customer></dd></div>
               <div><dt>Fecha de recojo</dt><dd data-pickup-date></dd></div>
-              <div><dt>Franja de recojo</dt><dd data-pickup-slot></dd></div>
+              <div><dt>Hora de recojo</dt><dd data-pickup-slot></dd></div>
               <div data-note-row hidden><dt>Observaciones</dt><dd data-notes></dd></div>
             </dl>
             <ul class="booking-items" data-booking-items></ul>
