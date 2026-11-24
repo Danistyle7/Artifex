@@ -181,6 +181,9 @@ button.button:disabled { cursor: default; opacity: .66; }
 .reservation-grid { display: grid; gap: 1.35rem; align-items: start; }
 .reservation-summary { grid-row: 1; padding: 1rem 1.15rem; border: 1px solid var(--line); background: var(--paper); }
 .reservation-summary h2 { font-size: 1.65rem; }
+.pickup-payment { margin-top: .75rem; padding-top: .65rem; border-top: 1px solid var(--line); color: var(--green); font-size: .89rem; }
+.catalog-empty { padding: 1.2rem; border: 1px solid var(--line); background: var(--paper); }
+.catalog-empty .text-link { margin-top: .4rem; }
 .reservation-summary dl { margin: .55rem 0 0; }
 .reservation-summary dl div, .booking-total { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: .35rem .6rem; }
 .reservation-summary dl div + div { margin-top: .4rem; padding-top: .45rem; border-top: 1px solid var(--line); font-weight: 700; }
@@ -212,14 +215,23 @@ button.button:disabled { cursor: default; opacity: .66; }
 .confirmation { max-width: 58rem; }
 .confirmation-lead { padding: clamp(1.15rem, 4vw, 3.25rem); background: var(--paper); border-top: 3px solid var(--clay); }
 .confirmation-lead h1 { margin-top: .4rem; }
-.confirmation-lead .demo-note { margin-bottom: .3rem; }
-.confirmation-summary { margin-top: clamp(1.8rem, 4vw, 3rem); }
+.receipt { margin-top: clamp(1.25rem, 4vw, 3rem); padding: clamp(.65rem, 3.5vw, 2rem); border: 1px solid var(--line); border-top: 3px solid var(--green); background: #fffaf0; }
+.receipt-heading { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: .6rem 1rem; }
+.receipt h2 { font-size: clamp(1.7rem, 4vw, 2.65rem); }
+.receipt-brand { margin-bottom: .25rem; color: var(--green); font-family: var(--serif); font-size: 1.28rem; }
+.receipt-code { display: grid; color: var(--green); }
+.receipt-code span, .receipt-footnote { color: var(--muted); font-size: .83rem; }
+.receipt-demo { margin-block: 1rem; padding: .55rem .7rem; border-left: 2px solid var(--clay); background: var(--paper); color: #713126; font-size: .9rem; }
+.receipt-items { width: 100%; border-collapse: collapse; font-size: clamp(.75rem, 2.4vw, .97rem); line-height: 1.35; }
+.receipt-items th, .receipt-items td { padding: .58rem clamp(.2rem, 1vw, .62rem); border-bottom: 1px solid var(--line); text-align: end; white-space: nowrap; }
+.receipt-items th { color: var(--green); }
+.receipt-items :is(th, td):first-child { padding-inline-start: 0; text-align: start; white-space: normal; overflow-wrap: anywhere; }
+.receipt-items :is(th, td):last-child { padding-inline-end: 0; }
+.receipt .booking-total { border-top: 0; }
 .booking-data { display: grid; gap: .8rem 1.25rem; margin-block: .75rem 1.3rem; }
 .booking-data dt { font-weight: 650; }
 .booking-data dd { margin: 0; color: var(--muted); overflow-wrap: anywhere; white-space: pre-wrap; }
-.booking-items { padding: 0; margin: 0; list-style: none; }
-.booking-items li { display: flex; justify-content: space-between; gap: .45rem .9rem; padding-block: .7rem; border-top: 1px solid var(--line); }
-.booking-items strong { white-space: nowrap; }
+
 .booking-total { padding-block: .7rem; border-top: 1px solid var(--line); font-weight: 700; color: var(--green); }
 
 @media (max-width: 52rem) {
@@ -256,4 +268,17 @@ button.button:disabled { cursor: default; opacity: .66; }
 .pickup-actions .button { margin-top: .25rem; text-align: left; }
 @media (max-width: 36rem) {
   .floating-cart { inset-inline: var(--gutter); }
+}
+
+@media print {
+  body:has([data-booking]:not([hidden])) { background: white; }
+  body:has([data-booking]:not([hidden])) :is(.site-header, .site-footer, .skip, .confirmation-lead) { display: none !important; }
+  .confirmation.wrap { width: 100%; max-width: none; padding: 0; }
+  .receipt { margin: 0; padding: .55cm .65cm; background: white; font-size: 10.5pt; }
+  .receipt h2 { font-size: 22pt; }
+  .receipt-demo { background: white; }
+  .receipt .booking-data { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .receipt-items { font-size: 10pt; }
+  .receipt-items thead { display: table-header-group; }
+  .receipt-items tr, .receipt .booking-data div, .receipt .booking-total { break-inside: avoid; }
 }

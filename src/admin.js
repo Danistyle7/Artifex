@@ -2,7 +2,7 @@ import { categories } from './catalog.mjs';
 import { escapeHtml, imageAddress } from './catalog-view.mjs';
 import { availabilityLabel, boliviaDate, formatBs, formatPickupDate, newDemoId } from './reservation-data.mjs';
 import { draftKey, initialCatalog, readDemo, storageKey, updateDemo } from './reservation-store.js';
-import { exampleOrders, filterOrders, nearestOrderDate, normalizeSearch, ordersOn, paginate, panesIn, pickupAgenda, production, shiftDate, statuses, summary } from './admin-data.mjs';
+import { canMarkUncollected, exampleOrders, filterOrders, isClosedOrder, nearestOrderDate, normalizeSearch, ordersOn, paginate, panesIn, pickupAgenda, production, shiftDate, statuses, summary } from './admin-data.mjs';
 
 const find = selector => document.querySelector(selector);
 const all = selector => [...document.querySelectorAll(selector)];
@@ -83,28 +83,29 @@ function renderSummary() {
   const values = summary(ordersOn(state.reservations, selectedDate));
   find('[data-day-description]').textContent = describeDate(selectedDate, today);
   find('[data-metrics]').innerHTML = metrics([
-    ['Reservas', values.orders], ['Por preparar', values.pending], ['Listos para recoger', values.prepared], ['Panes reservados', values.quantity],
+    ['Reservas', values.orders], ['Por preparar', values.pending], ['Listos para recoger', values.prepared], ['Unidades reservadas', values.quantity],
   ]);
   find('[data-value-metrics]').innerHTML = `<dl class="admin-summary-details">
     <div><dt>Entregados</dt><dd>${values.delivered}</dd></div>
+    <div><dt>No recogidos</dt><dd>${values.uncollected}</dd></div>
     <div><dt>Cancelados</dt><dd>${values.cancelled}</dd></div>
-    <div><dt>Valor de reservas vigentes</dt><dd>${formatBs(values.reservedValue)}</dd></div>
+    <div><dt>Valor de reservas sin cancelar</dt><dd>${formatBs(values.reservedValue)}</dd></div>
     <div><dt>Valor de pedidos entregados</dt><dd>${formatBs(values.deliveredValue)}</dd></div>
-  </dl><p class="admin-meta">Importes referenciales de la demo.</p>`;
+  </dl><p class="admin-meta">Importes referenciales de los pedidos.</p>`;
 
   const agenda = pickupAgenda(state.reservations, today).slice(0, 4);
   find('[data-agenda]').innerHTML = agenda.length
     ? `<div class="agenda-list">${agenda.map(({ date, orders, panes }) => `<article class="agenda-day">
       <header class="agenda-day-header">
         <div><h3><time datetime="${date}">${escapeHtml(describeDate(date, today))}</time></h3>
-          <p>${orders.length} ${orders.length === 1 ? 'pedido' : 'pedidos'} por recoger · ${panes} ${panes === 1 ? 'pan' : 'panes'}</p></div>
+          <p>${orders.length} ${orders.length === 1 ? 'pedido' : 'pedidos'} por recoger · ${panes} ${panes === 1 ? 'unidad' : 'unidades'}</p></div>
         <div class="admin-row-actions">
           <button class="text-link link-button" type="button" data-view-orders="${date}">Ver pedidos</button>
           <button class="text-link link-button" type="button" data-view-production="${date}">Ver producción</button>
         </div>
       </header>
       <ul class="admin-upcoming">${orders.slice(0, 3).map(order => `<li>
-        <div><strong>${escapeHtml(order.customer.name)}</strong><small>${escapeHtml(order.code)} · ${escapeHtml(order.pickup.slot)} · ${panesIn(order)} panes</small></div>
+        <div><strong>${escapeHtml(order.customer.name)}</strong><small>${escapeHtml(order.code)} · ${escapeHtml(order.pickup.slot)} · ${panesIn(order)} u.</small></div>
         <div class="admin-upcoming-action">${badge(order.status)}${orderButton(order.id)}</div>
       </li>`).join('')}</ul>
     </article>`).join('')}</div>`
@@ -120,6 +121,7 @@ function orderActions(order) {
       <summary aria-label="Más opciones de ${escapeHtml(order.code)}">Más</summary>
       <div>${primary ? orderButton(order.id) : ''}
         <button type="button" class="text-link link-button" data-order-edit="${id}">Cambiar estado</button>
+        ${primary && canMarkUncollected(order) ? `<button type="button" class="text-link link-button" data-order-change="${id}" data-target-status="no_recogido">Marcar no recogido</button>` : ''}
         ${order.status !== 'cancelado' ? `<button type="button" class="text-link link-button admin-danger" data-order-change="${id}" data-target-status="cancelado">Cancelar pedido</button>` : ''}
       </div>
     </details>
@@ -159,7 +161,7 @@ function renderOrders() {
       const date = escapeHtml(formatPickupDate(order.pickup.date));
       const timing = timingLabel(order.pickup.date, today);
       return [
-        `<strong>${escapeHtml(order.code)}</strong><small>${panesIn(order)} panes · ${formatBs(order.total)}</small>${order.source === 'example' ? '<small>Ejemplo</small>' : ''}`,
+        `<strong>${escapeHtml(order.code)}</strong><small>${panesIn(order)} u. · ${formatBs(order.total)}</small>${order.source === 'example' ? '<small>Ejemplo</small>' : ''}`,
         `<strong>${escapeHtml(order.customer.name)}</strong><small>${escapeHtml(order.customer.phone || 'Sin contacto')}</small>`,
         `<strong>${date}</strong><small>${escapeHtml(order.pickup.slot)}${timing ? ` · ${timing}` : ''}</small>`,
         badge(order.status), orderActions(order),
@@ -177,14 +179,17 @@ function renderProduction() {
   find('[data-production-date="next"]').disabled = !nearestOrderDate(state.reservations, shiftDate(today, 1));
   const plan = production(ordersOn(state.reservations, selectedDate));
   find('[data-production-metrics]').innerHTML = metrics([
-    ['Pedidos', plan.orders], ['Panes reservados', plan.units], ['Productos diferentes', plan.products], ['Pedidos por entregar', plan.toDeliver],
+    ['Reservas', plan.orders], ['Unidades reservadas', plan.units], ['Pedidos por preparar', plan.toPrepare], ['Pedidos por entregar', plan.toDeliver],
   ]);
+  const key = find('[data-production-key]');
+  key.hidden = plan.rows.length === 0;
+  key.textContent = `${plan.products} ${plan.products === 1 ? 'producto' : 'productos'}. El total reservado incluye los no recogidos y excluye los cancelados.`;
   find('[data-production]').innerHTML = plan.rows.length
-    ? table('Producción por pan', ['Pan', 'Por preparar', 'Preparados', 'Entregados', 'Total reservado'], plan.rows.map(row => [
+    ? table('Producción por producto', ['Producto', 'Reservado', 'Por preparar', 'Listo para entregar', 'Entregado', 'No recogido'], plan.rows.map(row => [
       `<button type="button" class="text-link link-button" data-view-orders="${selectedDate}" data-related-id="${escapeHtml(row.id)}" data-related-name="${escapeHtml(row.name)}">${escapeHtml(row.name)}</button>`,
-      row.pendiente, row.preparado, row.entregado, row.pendiente + row.preparado + row.entregado,
+      row.total, row.pendiente, row.preparado, row.entregado, row.no_recogido,
     ]))
-    : empty('Sin producción para esta fecha', 'Los pedidos vigentes se agrupan por pan. Los cancelados quedan en Pedidos.');
+    : empty('Sin producción para esta fecha', 'Selecciona otra fecha para consultar sus reservas.');
 }
 
 function renderProducts() {
@@ -288,7 +293,11 @@ function showOrder(order) {
   selectedOrder = order.id;
   find('[data-order-code]').textContent = order.code;
   find('[data-order-origin]').textContent = order.source === 'example' ? 'Pedido de ejemplo' : 'Reserva de demostración';
-  stateForm.elements.status.value = order.status;
+  const statusField = stateForm.elements.status;
+  const waitingForPickup = order.status !== 'no_recogido' && !canMarkUncollected(order);
+  statusField.querySelector('[value="no_recogido"]').disabled = waitingForPickup;
+  statusField.value = order.status;
+  find('#uncollected-help').hidden = !waitingForPickup;
   find('[data-order-detail]').innerHTML = `
     <dl class="booking-data">
       <div><dt>Cliente</dt><dd>${escapeHtml(order.customer.name)}</dd></div>
@@ -297,7 +306,7 @@ function showOrder(order) {
       <div><dt>Estado actual</dt><dd>${badge(order.status)}</dd></div>
       <div><dt>Observaciones</dt><dd>${escapeHtml(order.notes || 'Sin observaciones')}</dd></div>
     </dl>
-    ${table('Panes reservados', ['Pan', 'Unidades', 'Precio unitario', 'Subtotal'], order.items.map(item => [
+    ${table('Productos reservados', ['Producto', 'Unidades', 'Precio unitario', 'Subtotal'], order.items.map(item => [
       escapeHtml(item.name), item.quantity, formatBs(item.unitPrice), formatBs(item.subtotal),
     ]))}
     <p class="booking-total"><span>Total al reservar</span><strong>${formatBs(order.total)}</strong></p>`;
@@ -377,8 +386,14 @@ function proposeOrder(id, target, control) {
   }
   const action = { type: 'order', id, previous: order.status, target, control };
   if (target === 'cancelado') {
-    confirmAction(action, '¿Cancelar pedido?', `${order.code} quedará en el historial y sus panes dejarán de contar en producción.`, 'Confirmar cancelación');
-  } else if (order.status === 'entregado' || order.status === 'cancelado') {
+    confirmAction(action, '¿Cancelar pedido?', `${order.code} quedará en el historial y sus unidades dejarán de contar en producción.`, 'Confirmar cancelación');
+  } else if (target === 'no_recogido') {
+    if (!canMarkUncollected(order)) {
+      showError(orderDialog.open ? '[data-state-error]' : '[data-error]', 'La hora de recojo aún no ha terminado.');
+      return;
+    }
+    confirmAction(action, '¿Marcar como no recogido?', `${order.code} dejará de estar pendiente de entrega y seguirá contando en el total reservado de ese día.`, 'Confirmar como no recogido');
+  } else if (isClosedOrder(order.status)) {
     confirmAction(action, '¿Cambiar el estado?', `${order.code} pasará de ${statuses[order.status]} a ${statuses[target]}.`, 'Confirmar cambio');
   } else {
     applyAction(action);
@@ -410,7 +425,7 @@ async function applyAction({ type, id, previous, target, control }) {
     const updated = await updateDemo(data => {
       if (type === 'order') {
         const order = data.reservations.find(item => item.id === id);
-        if (!order || order.status !== previous) return null;
+        if (!order || order.status !== previous || (target === 'no_recogido' && !canMarkUncollected(order))) return null;
         order.status = target;
         order.updatedAt = new Date().toISOString();
         return order;
@@ -603,7 +618,7 @@ productForm.addEventListener('submit', async event => {
   const category = fields.get('category');
   const pickupDays = chosenDays();
   let error = '';
-  if (!name || !description) error = 'Escribe el nombre y la descripción del pan.';
+  if (!name || !description) error = 'Escribe el nombre y la descripción del producto.';
   else if (!Number.isFinite(price) || price < 0 || !Object.hasOwn(categories, category)) error = 'Revisa el precio y la categoría.';
   else if (!pickupDays.length) error = 'Selecciona al menos un día de recojo.';
   showError('[data-product-error]', error);

@@ -1,6 +1,8 @@
 export const categories = {
   habitual: { label: 'Panes habituales' },
-  especial: { label: 'Especiales de masa madre' },
+  especial: { label: 'Panes especiales' },
+  temporada: { label: 'De temporada' },
+  otros: { label: 'Otras elaboraciones' },
 };
 
 export const products = [

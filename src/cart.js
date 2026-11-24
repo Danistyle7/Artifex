@@ -20,7 +20,7 @@ export function initCart() {
     count.textContent = total;
     if (floating) {
       floating.hidden = total === 0;
-      floatingCount.textContent = `${total} ${total === 1 ? 'pan' : 'panes'}`;
+      floatingCount.textContent = `${total} ${total === 1 ? 'producto' : 'productos'}`;
       document.body.classList.toggle('has-floating-cart', total > 0);
     }
   }
@@ -38,9 +38,9 @@ export function initCart() {
     try {
       const result = await updateDemo(({ cart, catalog }) => {
         const product = catalog.find(item => item.slug === slug && item.active);
-        if (!product) return { message: 'Este pan ya no está disponible para reservar.' };
+        if (!product) return { message: 'Este producto ya no está disponible para reservar.' };
         const next = (cart[slug] ?? 0) + quantity;
-        if (next > maxQuantity) return { message: `Puedes agregar hasta ${maxQuantity} unidades por pan.` };
+        if (next > maxQuantity) return { message: `Puedes agregar hasta ${maxQuantity} unidades por producto.` };
         cart[slug] = next;
         return { added: true, message: `${product.name}: ${quantity} al carrito.` };
       });

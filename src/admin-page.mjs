@@ -45,7 +45,7 @@ export function adminPage() {
               <button class="button button-add" type="button" data-order-view="work" aria-pressed="true">Operación</button>
               <button class="button button-add" type="button" data-order-view="history" aria-pressed="false">Historial</button>
             </div>
-            <p class="admin-meta" data-history-note hidden>Consulta recojos de días anteriores y pedidos entregados o cancelados.</p>
+            <p class="admin-meta" data-history-note hidden>Consulta recojos de días anteriores y pedidos entregados, no recogidos o cancelados.</p>
             <div class="admin-filters admin-order-filters">
               <label class="admin-field" for="order-search">Buscar cliente, código o teléfono<input type="search" id="order-search"></label>
               <label class="admin-field" for="order-period" data-period-field>Período<select id="order-period">
@@ -83,8 +83,9 @@ export function adminPage() {
             </div>
             <div class="admin-metrics admin-metrics-compact" data-production-metrics></div>
             <section class="admin-block" aria-labelledby="production-heading">
-              <div class="admin-subhead"><h2 id="production-heading">Panes por producto</h2>
+              <div class="admin-subhead"><h2 id="production-heading">Unidades por producto</h2>
                 <button type="button" class="text-link link-button" data-open-production-orders>Ver pedidos de esta fecha</button></div>
+              <p class="admin-meta" data-production-key hidden></p>
               <div data-production></div>
             </section>
           </section>
@@ -117,11 +118,12 @@ export function adminPage() {
         <div data-order-detail></div>
         <form data-order-state>
           <div class="admin-filters">
-            <label class="admin-field" for="edit-status">Estado del pedido<select id="edit-status" name="status">
+            <label class="admin-field" for="edit-status">Estado del pedido<select id="edit-status" name="status" aria-describedby="uncollected-help">
               ${Object.entries(statuses).map(([key, label]) => `<option value="${key}">${label}</option>`).join('')}
             </select></label>
             <button class="button button-primary" type="submit">Guardar estado</button>
           </div>
+          <p class="admin-meta" id="uncollected-help" hidden>Puedes marcar «No recogido» cuando termine la hora de recojo.</p>
           <p class="admin-message" role="status" data-state-message></p>
           <p class="reservation-error" role="alert" data-state-error hidden></p>
         </form>

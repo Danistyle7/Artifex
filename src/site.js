@@ -34,6 +34,7 @@ const filters = document.querySelector('.filters');
 if (filters) {
   const buttons = Array.from(filters.querySelectorAll('[data-filter]'));
   const status = document.querySelector('#filter-count');
+  const emptyCategory = document.querySelector('[data-category-empty]');
 
   function applyFilter() {
     const category = filters.querySelector('[aria-pressed="true"]').dataset.filter;
@@ -42,7 +43,8 @@ if (filters) {
       card.hidden = category !== 'todos' && card.dataset.category !== category;
       if (!card.hidden) count += 1;
     });
-    status.textContent = count === 1 ? '1 pan mostrado' : `${count} panes mostrados`;
+    status.textContent = count === 1 ? '1 producto mostrado' : `${count} productos mostrados`;
+    emptyCategory.hidden = category === 'todos' || count > 0;
   }
 
   filters.hidden = false;
@@ -52,7 +54,13 @@ if (filters) {
     buttons.forEach(button => button.setAttribute('aria-pressed', String(button === selected)));
     applyFilter();
   });
+  document.querySelector('[data-show-all-products]').addEventListener('click', () => {
+    const showAll = filters.querySelector('[data-filter="todos"]');
+    showAll.click();
+    showAll.focus();
+  });
   document.addEventListener('artifex:products-rendered', applyFilter);
+  applyFilter();
 }
 
 initCart();

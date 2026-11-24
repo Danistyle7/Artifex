@@ -36,6 +36,7 @@
 .admin-badge[data-status="pendiente"] { background: #eddcbf; color: #674523; }
 .admin-badge[data-status="preparado"] { background: #dfebdc; color: #244939; }
 .admin-badge[data-status="entregado"] { background: #deebe8; color: #244844; }
+.admin-badge[data-status="no_recogido"] { background: #e8dce7; color: #57364f; }
 .admin-badge[data-status="cancelado"] { background: #f0ddd5; color: #713126; }
 .admin-product-name { display: flex; align-items: center; gap: .6rem; }
 .admin-thumb { flex: 0 0 3rem; width: 3rem; height: 3rem; background: var(--paper); }
@@ -152,4 +153,8 @@
 .admin-days .admin-day:has(:checked) { background: #e0ebde; border-color: #718a76; color: var(--green); }
 @media (min-width: 51rem) {
   .admin-metrics-status, .admin-summary-details { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+[data-production-key] { margin: 0 0 .75rem; }
+@media (min-width: 64rem) {
+  .admin-summary-details { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 }

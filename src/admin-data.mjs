@@ -1,12 +1,25 @@
-import { pickupDates } from './reservation-data.mjs';
+import { boliviaDate, pickup, pickupDates } from './reservation-data.mjs';
 
 export const statuses = {
   pendiente: 'Pendiente',
   preparado: 'Preparado',
   entregado: 'Entregado',
+  no_recogido: 'No recogido',
   cancelado: 'Cancelado',
 };
 
+const pickupClock = new Intl.DateTimeFormat('en-GB', {
+  timeZone: pickup.timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+});
+
+export function canMarkUncollected(order, now = new Date()) {
+  const today = boliviaDate(now);
+  if (order.pickup.date !== today) return order.pickup.date < today;
+  const end = order.pickup.slot.match(/(?:^|\s)((?:[01]\d|2[0-3]):[0-5]\d)$/u)?.[1];
+  return Boolean(end && pickupClock.format(now) >= end);
+}
+
+export const isClosedOrder = status => status === 'entregado' || status === 'no_recogido' || status === 'cancelado';
 export const orderPageSize = 10;
 export const panesIn = order => order.items.reduce((total, item) => total + item.quantity, 0);
 export const ordersOn = (orders, date) => orders.filter(order => order.pickup.date === date);
@@ -50,8 +63,7 @@ export function filterOrders(orders, filters, today) {
 
   const matches = orders.filter(order => {
     const day = order.pickup.date;
-    const closed = order.status === 'entregado' || order.status === 'cancelado';
-    if (history && day >= today && !closed) return false;
+    if (history && day >= today && !isClosedOrder(order.status)) return false;
     if ((first && day < first) || (last && day > last) || (status && status !== order.status)) return false;
     if (productId && (order.status === 'cancelado' || !order.items.some(item => item.productId === productId))) return false;
     const phone = (order.customer.phone || '').replace(/\D/gu, '');
@@ -85,6 +97,7 @@ export function summary(orders) {
     pending: active.filter(order => order.status === 'pendiente').length,
     prepared: active.filter(order => order.status === 'preparado').length,
     delivered: delivered.length,
+    uncollected: active.filter(order => order.status === 'no_recogido').length,
     cancelled: orders.length - active.length,
     quantity: active.reduce((total, order) => total + panesIn(order), 0),
     reservedValue: sumValue(active),
@@ -115,8 +128,11 @@ export function production(orders) {
   const products = new Map();
   for (const order of active) {
     for (const item of order.items) {
-      const row = products.get(item.productId) ?? { id: item.productId, name: item.name, pendiente: 0, preparado: 0, entregado: 0 };
+      const row = products.get(item.productId) ?? {
+        id: item.productId, name: item.name, pendiente: 0, preparado: 0, entregado: 0, no_recogido: 0, total: 0,
+      };
       row[order.status] += item.quantity;
+      row.total += item.quantity;
       products.set(item.productId, row);
     }
   }
@@ -126,7 +142,8 @@ export function production(orders) {
     orders: active.length,
     units: active.reduce((total, order) => total + panesIn(order), 0),
     products: rows.length,
-    toDeliver: active.filter(order => order.status !== 'entregado').length,
+    toPrepare: active.filter(order => order.status === 'pendiente').length,
+    toDeliver: active.filter(order => !isClosedOrder(order.status)).length,
   };
 }
 

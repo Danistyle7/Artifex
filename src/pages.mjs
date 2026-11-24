@@ -16,7 +16,7 @@ const header = (root, page) => `
 
       <nav class="site-nav" id="navigation" aria-label="Principal">
         <a href="${root}"${page === 'inicio' ? ' aria-current="page"' : ''}>Inicio</a>
-        <a href="${root}panes/"${page === 'panes' ? ' aria-current="page"' : ''}>Nuestros panes</a>
+        <a href="${root}panes/"${page === 'panes' ? ' aria-current="page"' : ''}>Nuestros productos</a>
         <a href="${root}#historia">Nuestra historia</a>
         <a href="${root}#contacto">Contacto</a>
       </nav>
@@ -42,7 +42,7 @@ const footer = (root) => `
         </div>
         <div>
           <h2>Reservas web</h2>
-          <p>Elige tus panes y simula una reserva para recojo.</p>
+          <p>Reserva para recojo. El pago se realiza en la panadería.</p>
           <a href="${root}reservar/">Ir al carrito</a>
         </div>
       </div>
@@ -94,9 +94,9 @@ export function home(assets) {
   const root = './';
   const picks = featured.map(slug => products.find(product => product.slug === slug));
   const steps = [
-    ['Elige tus panes', 'Explora los panes de cada hornada.'],
+    ['Elige tus productos', 'Agrega al carrito lo que quieras reservar.'],
     ['Selecciona cuándo recogerlos', 'Elige uno de los horarios de recojo disponibles.'],
-    ['Confirma tu reserva', 'Ten a mano el resumen de tus panes y del recojo.'],
+    ['Confirma y recoge', 'Guarda tu constancia y paga en la panadería al recoger.'],
   ];
   return layout({
     root, page: 'inicio', title: 'Artifex · Pan con alma',
@@ -108,7 +108,7 @@ export function home(assets) {
           <h1 id="hero-title">Pan con <em>alma</em></h1>
           <p>Panes de fermentación natural, elaborados con tiempo y dedicación en Cochabamba.</p>
           <div class="actions">
-            <a class="button button-primary" href="./panes/">Explorar nuestros panes</a>
+            <a class="button button-primary" href="./panes/">Explorar productos</a>
             <a class="text-link" href="#historia">Conocer la panadería</a>
           </div>
         </div>
@@ -117,7 +117,7 @@ export function home(assets) {
 
       <section class="section wrap" aria-labelledby="featured-title">
         <div class="section-lead">
-          <div><h2 id="featured-title">Nuestros panes</h2><p>Una selección de las elaboraciones de Artifex.</p></div>
+          <div><h2 id="featured-title">Nuestros productos</h2><p>Una selección de las elaboraciones de Artifex.</p></div>
           <a class="text-link" href="./panes/">Ver catálogo completo</a>
         </div>
         <div class="product-grid" data-public-products="featured">${picks.map(product => productCard(product, root, localProductImage(product, root, assets))).join('')}</div>
@@ -136,9 +136,9 @@ export function home(assets) {
 
       <section class="section wrap reserve" id="reservas" aria-labelledby="reserve-title">
         <h2 id="reserve-title">Cómo reservar</h2>
-        <p class="reserve-intro">Prueba cómo sería reservar tus panes para recojo en Artifex.</p>
+        <p class="reserve-intro">Elige tus productos, reserva un horario y recoge tu pedido en la panadería.</p>
         <ol class="steps">${steps.map(([title, detail]) => `<li><h3>${title}</h3><p>${detail}</p></li>`).join('')}</ol>
-        <a class="button button-primary" href="./panes/">Explorar nuestros panes</a>
+        <a class="button button-primary" href="./panes/">Empezar mi reserva</a>
       </section>`,
   });
 }
@@ -146,21 +146,25 @@ export function home(assets) {
 export function catalog(assets) {
   const root = '../';
   return layout({
-    root, page: 'panes', title: 'Nuestros panes · Artifex',
-    description: 'Catálogo de Artifex con panes habituales y especiales de masa madre.',
+    root, page: 'panes', title: 'Nuestros productos · Artifex',
+    description: 'Catálogo de Artifex con panes y otras elaboraciones artesanales.',
     content: `
       <section class="catalog-heading" aria-labelledby="catalog-title">
-        <div class="wrap"><p class="eyebrow">Panadería artesanal</p><h1 id="catalog-title">Nuestros panes</h1>
-        <p>Explora las hogazas, baguettes y especialidades que Artifex ha compartido desde su obrador.</p></div>
+        <div class="wrap"><p class="eyebrow">Panadería artesanal</p><h1 id="catalog-title">Nuestros productos</h1>
+        <p>Explora los productos de Artifex. Elige qué quieres reservar y selecciona el día de recojo en el carrito.</p></div>
       </section>
-      <section class="section wrap catalog" aria-label="Catálogo de panes">
-        <div class="filters" role="group" aria-label="Filtrar panes" hidden>
-          <button type="button" data-filter="todos" aria-pressed="true">Todos los panes</button>
+      <section class="section wrap catalog" aria-label="Catálogo de productos">
+        <div class="filters" role="group" aria-label="Filtrar productos" hidden>
+          <button type="button" data-filter="todos" aria-pressed="true">Todos los productos</button>
           ${Object.entries(categories).map(([key, category]) => `<button type="button" data-filter="${key}" aria-pressed="false">${category.label}</button>`).join('')}
         </div>
         <p class="demo-note catalog-note">${descriptionNote}</p>
         <p class="sr-only" role="status" id="filter-count"></p>
         <div class="product-grid" data-public-products="all">${products.map(product => productCard(product, root, localProductImage(product, root, assets))).join('')}</div>
+        <div class="catalog-empty" data-category-empty hidden>
+          <p>Por ahora no hay productos en esta categoría.</p>
+          <button class="text-link link-button" type="button" data-show-all-products>Ver todos los productos</button>
+        </div>
       </section>`,
   });
 }
@@ -168,12 +172,12 @@ export function catalog(assets) {
 export function detail(product, assets) {
   const root = '../../';
   return layout({
-    root, page: 'detalle', title: product ? `${product.name} · Artifex` : 'Detalle del pan · Artifex',
-    description: product?.description ?? 'Detalle de un pan de Artifex.',
+    root, page: 'detalle', title: product ? `${product.name} · Artifex` : 'Detalle del producto · Artifex',
+    description: product?.description ?? 'Detalle de un producto de Artifex.',
     content: `<div class="wrap detail">
-      <a class="text-link back" href="../">Volver a nuestros panes</a>
+      <a class="text-link back" href="../">Volver al catálogo</a>
       <div data-public-product="${product?.slug ?? ''}">
-        ${product ? productDetail(product, root, localProductImage(product, root, assets)) : '<noscript>Activa JavaScript para consultar este pan de la demo.</noscript>'}
+        ${product ? productDetail(product, root, localProductImage(product, root, assets)) : '<noscript>Activa JavaScript para consultar este producto de la demo.</noscript>'}
       </div>
     </div>`,
   });

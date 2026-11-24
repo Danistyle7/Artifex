@@ -67,9 +67,9 @@ function checkout(container) {
     incompatible.hidden = !conflicts.length && !noCommonDate;
     const names = (inactive.length ? inactive : conflicts).map(({ product }) => product.name).join(', ');
     find('[data-incompatible-message]').textContent = inactive.length
-      ? `${names}: ya no está disponible para reservar. Retíralo del carrito para continuar.`
+      ? `${names}: disponibilidad cambiada. Retira del carrito los productos indicados para continuar.`
       : noCommonDate
-        ? 'No hay una fecha próxima en la que estén disponibles todos tus panes. Puedes editar tu carrito.'
+        ? 'No hay una fecha próxima en la que estén disponibles todos los productos de tu carrito. Puedes editar tu carrito.'
         : conflicts.length ? `Para esta fecha faltaría: ${names}. Puedes elegir otro día o editar tu carrito.` : '';
     const alternative = conflicts.length && compatible && compatible.date !== selected?.date ? compatible : null;
     suggestion.hidden = !alternative;
@@ -80,7 +80,7 @@ function checkout(container) {
 
   function showDateOptions() {
     replaceOptions(date, 'Elige una fecha', dates.map(option => {
-      const label = unavailableItems(items, option).length ? `${option.label} · no están todos tus panes` : option.label;
+      const label = unavailableItems(items, option).length ? `${option.label} · faltan productos` : option.label;
       return new Option(label, option.date);
     }));
     checkPickup();
@@ -118,7 +118,7 @@ function checkout(container) {
       const state = readDemo();
       items = cartItems(state.cart, state.catalog);
       displayedCart = JSON.stringify(items);
-      const last = state.reservations.at(-1);
+      const last = state.reservations.findLast(reservation => reservation?.id && reservation.source !== 'example');
       lastReservation.hidden = !last?.id;
       if (last?.id) lastReservation.href = confirmationUrl(last).href;
     } catch {
@@ -232,17 +232,22 @@ function checkout(container) {
       const reservation = await updateDemo(state => {
         const current = cartItems(state.cart, state.catalog);
         if (JSON.stringify(current) !== expectedCart || !current.length) {
-          throw new CheckoutError('Tu carrito cambió. Revisa tus panes antes de confirmar.');
+          throw new CheckoutError('Tu carrito cambió. Revísalo antes de confirmar.');
         }
         const currentDate = pickupDates().find(option => option.date === selected.date);
         if (!currentDate?.slots.includes(selectedSlot) || unavailableItems(current, currentDate).length) {
           throw new CheckoutError('La fecha o la hora ya no está disponible para tu selección. Elige otra opción.');
         }
 
-        const id = newDemoId();
+        let id;
+        let code;
+        do {
+          id = newDemoId();
+          code = `ART-${id.slice(0, 8).toUpperCase()}`;
+        } while (state.reservations.some(booking => booking?.code === code));
         const booking = {
           id,
-          code: `ART-${id.slice(0, 8).toUpperCase()}`,
+          code,
           customer: { name, phone },
           items: current.map(({ product, quantity, subtotal }) => ({
             productId: product.slug, name: product.name, quantity, unitPrice: product.price, subtotal,
@@ -308,14 +313,15 @@ function confirmation(container) {
   find('[data-notes]').textContent = booking.notes;
   find('[data-booking-total]').textContent = formatBs(booking.total);
   find('[data-booking-items]').replaceChildren(...booking.items.map(item => {
-    const row = document.createElement('li');
-    const name = document.createElement('span');
-    const price = document.createElement('strong');
-    name.textContent = `${item.quantity} × ${item.name}`;
-    price.textContent = formatBs(item.subtotal);
-    row.append(name, price);
+    const row = document.createElement('tr');
+    for (const value of [item.name, item.quantity, formatBs(item.unitPrice), formatBs(item.subtotal)]) {
+      const cell = row.insertCell();
+      cell.textContent = value;
+    }
     return row;
   }));
+  document.title = `Constancia Artifex ${booking.code}`;
+  find('[data-print-receipt]').addEventListener('click', () => window.print());
   find('[data-booking]').hidden = false;
   if (window.location.hash === '#resumen') document.querySelector('#resumen').scrollIntoView();
 }

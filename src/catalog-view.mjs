@@ -51,9 +51,9 @@ export function productCard(product, root, image, interactive = false) {
 
 export function productDetail(product, root, image, interactive = false) {
   if (!product || product.active === false) {
-    return `<section class="reservation-empty"><h1>Pan no disponible</h1>
-      <p>Este pan ya no está disponible para nuevas reservas.</p>
-      <a class="button button-primary" href="${root}panes/">Explorar otros panes</a></section>`;
+    return `<section class="reservation-empty"><h1>Producto no disponible</h1>
+      <p>Este producto ya no está disponible para nuevas reservas.</p>
+      <a class="button button-primary" href="${root}panes/">Explorar otros productos</a></section>`;
   }
 
   const name = escapeHtml(product.name);

@@ -31,7 +31,7 @@ export function initPublicCatalog() {
       if (!selection.length && active.length) selection = active.slice(0, 3);
       grid.innerHTML = selection.length
         ? selection.map(product => productCard(product, root, image(product), true)).join('')
-        : '<p>Por ahora no hay panes disponibles para nuevas reservas.</p>';
+        : '<p>Por ahora no hay productos disponibles para nuevas reservas.</p>';
       grid.dispatchEvent(new Event('artifex:products-rendered', { bubbles: true }));
     }
 
@@ -39,7 +39,7 @@ export function initPublicCatalog() {
       const slug = detail.dataset.publicProduct || new URLSearchParams(location.search).get('id');
       const product = catalog.find(item => item.slug === slug && item.active);
       detail.innerHTML = productDetail(product, root, product ? image(product) : '', true);
-      document.title = product ? `${product.name} · Artifex` : 'Pan no disponible · Artifex';
+      document.title = product ? `${product.name} · Artifex` : 'Producto no disponible · Artifex';
     }
   }
 
