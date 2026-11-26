@@ -1,4 +1,4 @@
-import { boliviaDate, pickup, pickupDates } from './reservation-data.mjs';
+import { boliviaDate, boliviaTime, isCounterSale, pickup, pickupDates, pickupWeekday } from './reservation-data.mjs';
 
 export const statuses = {
   pendiente: 'Pendiente',
@@ -8,15 +8,12 @@ export const statuses = {
   cancelado: 'Cancelado',
 };
 
-const pickupClock = new Intl.DateTimeFormat('en-GB', {
-  timeZone: pickup.timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-});
 
 export function canMarkUncollected(order, now = new Date()) {
   const today = boliviaDate(now);
   if (order.pickup.date !== today) return order.pickup.date < today;
   const end = order.pickup.slot.match(/(?:^|\s)((?:[01]\d|2[0-3]):[0-5]\d)$/u)?.[1];
-  return Boolean(end && pickupClock.format(now) >= end);
+  return Boolean(end && boliviaTime(now) >= end);
 }
 
 export const isClosedOrder = status => status === 'entregado' || status === 'no_recogido' || status === 'cancelado';
@@ -40,7 +37,7 @@ export function sortedOrders(orders, newestFirst = false) {
 }
 
 export function filterOrders(orders, filters, today) {
-  const { view, period, date, from, to, status, query, productId } = filters;
+  const { view, period, date, from, to, status, source, query, productId } = filters;
   const history = view === 'history';
   const search = normalizeSearch(query.trim());
   const phoneQuery = /^[\d+\s()-]+$/u.test(search) ? search.replace(/\D/gu, '') : '';
@@ -49,32 +46,23 @@ export function filterOrders(orders, filters, today) {
   if (history || period === 'range') {
     first = from;
     last = to;
-  } else if (period === 'today' || period === 'tomorrow') {
-    first = last = period === 'today' ? today : shiftDate(today, 1);
-  } else if (period === 'upcoming') {
-    first = today;
-  } else if (period === 'week') {
-    first = today;
-    last = shiftDate(today, 6);
-  } else if (period === 'date') {
+  } else {
     if (!date) return [];
     first = last = date;
   }
 
+  const within = day => (!first || day >= first) && (!last || day <= last);
   const matches = orders.filter(order => {
     const day = order.pickup.date;
     if (history && day >= today && !isClosedOrder(order.status)) return false;
-    if ((first && day < first) || (last && day > last) || (status && status !== order.status)) return false;
-    if (productId && (order.status === 'cancelado' || !order.items.some(item => item.productId === productId))) return false;
+    if (!within(day) && (productId || order.status !== 'entregado' || !within(deliveryDate(order)))) return false;
+    if (status && status !== order.status) return false;
+    if (source && source !== (order.source || 'demo')) return false;
+    if (productId && (isCounterSale(order) || order.status === 'cancelado' || !order.items.some(item => item.productId === productId))) return false;
     const phone = (order.customer.phone || '').replace(/\D/gu, '');
     return !search || normalizeSearch(`${order.customer.name} ${order.code}`).includes(search) ||
       Boolean(phoneQuery && phone.includes(phoneQuery));
   });
-  if (!history && period === 'all') {
-    const upcoming = matches.filter(order => order.pickup.date >= today);
-    const past = matches.filter(order => order.pickup.date < today);
-    return [...sortedOrders(upcoming), ...sortedOrders(past, true)];
-  }
   return sortedOrders(matches, history);
 }
 
@@ -101,13 +89,36 @@ export function summary(orders) {
     cancelled: orders.length - active.length,
     quantity: active.reduce((total, order) => total + panesIn(order), 0),
     reservedValue: sumValue(active),
-    deliveredValue: sumValue(delivered),
+
   };
 }
 
-export function nearestOrderDate(orders, from, includePast = false) {
-  const dates = Array.from(new Set(orders.filter(order => order.status !== 'cancelado').map(order => order.pickup.date))).sort();
-  return dates.find(date => date >= from) ?? (includePast ? dates.at(-1) : undefined);
+export function deliveryDate(order) {
+  if (order.deliveredOn) return order.deliveredOn;
+  const updated = new Date(order.updatedAt ?? '');
+  return Number.isNaN(updated.valueOf()) ? order.pickup.date : boliviaDate(updated);
+}
+
+export function salesOn(orders, date) {
+  const sales = orders.filter(order => order.status === 'entregado' && deliveryDate(order) === date);
+  const counter = sales.filter(isCounterSale);
+  const products = new Map();
+  for (const order of sales) {
+    for (const item of order.items) {
+      const row = products.get(item.productId) ?? { name: item.name, quantity: 0, cents: 0 };
+      row.quantity += item.quantity;
+      row.cents += Math.round(item.subtotal * 100);
+      products.set(item.productId, row);
+    }
+  }
+  return {
+
+    units: sales.reduce((total, order) => total + panesIn(order), 0),
+    value: sumValue(sales),
+    counterValue: sumValue(counter),
+    reservationValue: sumValue(sales.filter(order => !isCounterSale(order))),
+    products: [...products.values()].sort((a, b) => a.name.localeCompare(b.name, 'es')),
+  };
 }
 
 export function pickupAgenda(orders, today) {
@@ -124,7 +135,7 @@ export function pickupAgenda(orders, today) {
 }
 
 export function production(orders) {
-  const active = orders.filter(order => order.status !== 'cancelado');
+  const active = orders.filter(order => order.status !== 'cancelado' && !isCounterSale(order));
   const products = new Map();
   for (const order of active) {
     for (const item of order.items) {
@@ -150,10 +161,12 @@ export function production(orders) {
 export function exampleOrders(catalog, now = new Date()) {
   const [first, second] = pickupDates(now);
   if (!first) return [];
+  const date = boliviaDate(now);
+  const today = { date, slots: pickup.weekdays[pickupWeekday(date)] ?? first.slots };
   const examples = [
-    ['ejemplo-01', 'Lucía R. · Ejemplo', 'pendiente', first, { baguette: 3, integral: 2 }],
-    ['ejemplo-02', 'Mateo V. · Ejemplo', 'preparado', first, { ciabatta: 4 }],
-    ['ejemplo-03', 'Elena M. · Ejemplo', 'entregado', first, { baguette: 2 }],
+    ['ejemplo-01', 'Lucía R. · Ejemplo', 'pendiente', first, { baguette: 3 }],
+    ['ejemplo-02', 'Mateo V. · Ejemplo', 'preparado', today, { baguette: 4 }],
+    ['ejemplo-03', 'Elena M. · Ejemplo', 'entregado', today, { baguette: 2 }],
     ['ejemplo-04', 'Sofía A. · Ejemplo', 'cancelado', second ?? first, { baguette: 3 }],
   ];
   return examples.map(([id, name, status, date, quantities], index) => {

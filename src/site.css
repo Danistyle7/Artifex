@@ -269,16 +269,3 @@ button.button:disabled { cursor: default; opacity: .66; }
 @media (max-width: 36rem) {
   .floating-cart { inset-inline: var(--gutter); }
 }
-
-@media print {
-  body:has([data-booking]:not([hidden])) { background: white; }
-  body:has([data-booking]:not([hidden])) :is(.site-header, .site-footer, .skip, .confirmation-lead) { display: none !important; }
-  .confirmation.wrap { width: 100%; max-width: none; padding: 0; }
-  .receipt { margin: 0; padding: .55cm .65cm; background: white; font-size: 10.5pt; }
-  .receipt h2 { font-size: 22pt; }
-  .receipt-demo { background: white; }
-  .receipt .booking-data { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .receipt-items { font-size: 10pt; }
-  .receipt-items thead { display: table-header-group; }
-  .receipt-items tr, .receipt .booking-data div, .receipt .booking-total { break-inside: avoid; }
-}

@@ -2,6 +2,11 @@ export const pickup = {
   timeZone: 'America/La_Paz',
   daysAhead: 14,
   weekdays: {
+    0: ['09:00 a 11:00'],
+    1: ['09:00 a 11:00', '16:00 a 18:00'],
+    2: ['09:00 a 11:00', '16:00 a 18:00'],
+    3: ['09:00 a 11:00', '16:00 a 18:00'],
+    4: ['09:00 a 11:00', '16:00 a 18:00'],
     5: ['09:00 a 11:00', '16:00 a 18:00'],
     6: ['08:30 a 10:30', '10:30 a 12:30'],
   },
@@ -25,7 +30,28 @@ const dateLabel = new Intl.DateTimeFormat('es-BO', {
 const amount = new Intl.NumberFormat('es-BO', {
   minimumFractionDigits: 2, maximumFractionDigits: 2,
 });
-const weekdayNames = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+export const weekdayNames = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+const dayList = new Intl.ListFormat('es-BO', { type: 'conjunction' });
+const timeInBolivia = new Intl.DateTimeFormat('en-GB', {
+  timeZone: pickup.timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+});
+
+export const boliviaTime = (now = new Date()) => timeInBolivia.format(now);
+
+export function pickupWeekday(date) {
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(date)) return undefined;
+  const day = new Date(`${date}T12:00:00Z`);
+  return Number.isNaN(day.valueOf()) || !day.toISOString().startsWith(date) ? undefined : day.getUTCDay();
+}
+
+export const orderSources = {
+  demo: 'Web',
+  whatsapp: 'WhatsApp',
+  counter: 'Mostrador',
+  example: 'Ejemplo',
+};
+
+export const isCounterSale = order => order.source === 'counter';
 
 export function boliviaDate(now = new Date()) {
   const parts = Object.fromEntries(dateInBolivia.formatToParts(now).map(({ type, value }) => [type, value]));
@@ -53,7 +79,7 @@ export function formatPickupDate(date) {
 
 export function availabilityLabel(product) {
   if (product.pickupDays === 'all') return 'Todos los días de recojo';
-  return product.pickupDays.map(day => weekdayNames[day]).join(' y ');
+  return dayList.format(product.pickupDays.map(day => weekdayNames[day]));
 }
 
 export function unavailableItems(items, date) {

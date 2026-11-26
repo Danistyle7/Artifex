@@ -1,5 +1,5 @@
 import { products } from './catalog.mjs';
-import { maxQuantity } from './reservation-data.mjs';
+import { maxQuantity, newDemoId } from './reservation-data.mjs';
 
 export const storageKey = 'artifex:demo:v1';
 export const draftKey = `${storageKey}:draft`;
@@ -44,6 +44,34 @@ export function cartItems(cart, catalog) {
 
 export function cartTotal(items) {
   return items.reduce((cents, item) => cents + Math.round(item.subtotal * 100), 0) / 100;
+}
+
+export function createReservation(state, { customer, items, pickup, notes, source = 'demo', status = 'pendiente' }) {
+  let id;
+  let code;
+  do {
+    id = newDemoId();
+    code = `ART-${id.slice(0, 8).toUpperCase()}`;
+  } while (state.reservations.some(booking => booking?.code === code));
+
+  const booking = {
+    id,
+    code,
+    customer,
+    items: items.map(({ product, quantity, subtotal }) => ({
+      productId: product.slug, name: product.name, quantity, unitPrice: product.price, subtotal,
+    })),
+    currency: 'BOB',
+    total: cartTotal(items),
+    pickup,
+    notes,
+    createdAt: new Date().toISOString(),
+    status,
+    source,
+  };
+  if (status === 'entregado') booking.deliveredOn = pickup.date;
+  state.reservations.push(booking);
+  return booking;
 }
 
 export async function updateDemo(update) {

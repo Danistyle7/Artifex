@@ -114,11 +114,12 @@ export function reservationConfirmation() {
           <section class="confirmation-lead" aria-labelledby="confirmation-title">
             <p class="eyebrow">Artifex · Demostración</p>
             <h1 id="confirmation-title">Reserva guardada</h1>
-            <p>Tu constancia está lista para imprimir o guardar como PDF.</p>
+            <p>Descarga tu ticket para tener a mano el código y los datos de recojo.</p>
             <div class="actions reservation-actions">
-              <button class="button button-primary" type="button" data-print-receipt>Imprimir o guardar como PDF</button>
+              <button class="button button-primary" type="button" data-download-ticket>Descargar ticket PDF</button>
               <a class="text-link" href="../panes/">Volver al catálogo</a>
             </div>
+            <p class="reservation-error" role="alert" data-ticket-error hidden>No se pudo descargar el ticket. Vuelve a intentarlo.</p>
           </section>
           <section class="confirmation-summary receipt" id="resumen" aria-labelledby="booking-heading" tabindex="-1">
             <div class="receipt-heading">

@@ -14,7 +14,7 @@ const images = files.filter(name => /\.(jpg|webp)$/u.test(name));
 const assets = Object.fromEntries(images.map(name => [name.replace(/\.(jpg|webp)$/u, ''), name]));
 await Promise.all([
   ...images.map(name => copyFile(new URL(name, publicAssets), new URL(name, outputAssets))),
-  ...['site.css', 'site.js', 'catalog.mjs', 'cart.js', 'reservation.js', 'reservation-data.mjs', 'reservation-store.js', 'catalog-view.mjs', 'public-catalog.js', 'admin.js', 'admin-data.mjs', 'admin.css'].map(name => copyFile(new URL(`../src/${name}`, import.meta.url), new URL(name, outputAssets))),
+  ...['site.css', 'site.js', 'catalog.mjs', 'cart.js', 'reservation.js', 'reservation-data.mjs', 'reservation-store.js', 'ticket-pdf.js', 'catalog-view.mjs', 'public-catalog.js', 'admin.js', 'order-entry.js', 'admin-data.mjs', 'admin.css'].map(name => copyFile(new URL(`../src/${name}`, import.meta.url), new URL(name, outputAssets))),
 ]);
 
 const pages = [

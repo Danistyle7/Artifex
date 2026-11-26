@@ -1,10 +1,10 @@
 import { layout, wordmark } from './pages.mjs';
 import { categories } from './catalog.mjs';
-import { pickup } from './reservation-data.mjs';
+import { maxQuantity, orderSources, weekdayNames } from './reservation-data.mjs';
 import { statuses } from './admin-data.mjs';
 
-const sections = [['resumen', 'Inicio'], ['pedidos', 'Pedidos'], ['produccion', 'Producción'], ['productos', 'Catálogo']];
-const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+const sections = [['resumen', 'Inicio'], ['pedidos', 'Pedidos y ventas'], ['produccion', 'Producción'], ['productos', 'Catálogo']];
+const week = [1, 2, 3, 4, 5, 6, 0];
 const dateInput = (id, label, attributes = '') => `<label class="admin-field" for="${id}" ${attributes}>${label}<input type="date" id="${id}"></label>`;
 const categoryOptions = Object.entries(categories).map(([key, category]) => `<option value="${key}">${category.label}</option>`).join('');
 
@@ -33,36 +33,63 @@ export function adminPage() {
               ${dateInput('summary-date', 'Fecha del resumen')}</div>
             <div class="admin-metrics admin-metrics-status" data-metrics></div>
             <div class="admin-summary-values" data-value-metrics></div>
+            <section class="admin-block" aria-labelledby="day-orders-heading">
+              <div class="admin-subhead">
+                <h2 id="day-orders-heading">Movimientos del día</h2>
+                <button class="text-link link-button" type="button" data-day-orders>Ver lista completa</button>
+              </div>
+              <div data-daily-orders></div>
+            </section>
+            <section class="admin-block" aria-labelledby="sales-heading">
+              <div class="admin-subhead"><h2 id="sales-heading">Ventas registradas</h2></div>
+              <div class="admin-metrics admin-metrics-compact" data-sales-metrics></div>
+              <p class="admin-meta">Importes referenciales según la fecha de entrega o venta.</p>
+              <details class="admin-sold-products" data-sold-products hidden>
+                <summary>Ver productos vendidos</summary>
+                <div data-sales-products></div>
+              </details>
+            </section>
             <section class="admin-block admin-agenda" aria-labelledby="agenda-heading">
-              <div class="admin-subhead"><h2 id="agenda-heading">Agenda de recojos</h2><a class="text-link" href="#pedidos">Ir a Pedidos</a></div>
-              <p class="admin-meta">Pedidos pendientes y listos para recoger, agrupados por fecha.</p>
+              <div class="admin-subhead"><h2 id="agenda-heading">Próximos recojos</h2></div>
+              <p class="admin-meta">Pedidos por recoger en los días siguientes.</p>
               <div data-agenda></div>
             </section>
           </section>
           <section data-panel="pedidos" hidden>
-            <div class="admin-lead"><h1>Pedidos</h1></div>
-            <div class="admin-order-tabs" role="group" aria-label="Vista de pedidos">
-              <button class="button button-add" type="button" data-order-view="work" aria-pressed="true">Operación</button>
+            <div class="admin-lead">
+              <div><h1>Pedidos y ventas</h1><p class="admin-meta">Reservas web, por WhatsApp y ventas de mostrador.</p></div>
+              <button class="button button-primary" type="button" data-register-order>Registrar pedido o venta</button>
+            </div>
+            <div class="admin-order-tabs" role="group" aria-label="Vista de pedidos y ventas">
+              <button class="button button-add" type="button" data-order-view="work" aria-pressed="true">Por fecha</button>
               <button class="button button-add" type="button" data-order-view="history" aria-pressed="false">Historial</button>
             </div>
-            <p class="admin-meta" data-history-note hidden>Consulta recojos de días anteriores y pedidos entregados, no recogidos o cancelados.</p>
-            <div class="admin-filters admin-order-filters">
-              <label class="admin-field" for="order-search">Buscar cliente, código o teléfono<input type="search" id="order-search"></label>
-              <label class="admin-field" for="order-period" data-period-field>Período<select id="order-period">
-                <option value="upcoming">Hoy y próximos días</option>
-                <option value="today">Hoy</option><option value="tomorrow">Mañana</option><option value="week">Próximos 7 días</option>
-                <option value="date">Fecha específica</option><option value="range">Rango de fechas</option><option value="all">Todos</option>
-              </select></label>
-              <label class="admin-field" for="order-status">Estado<select id="order-status">
-                <option value="">Todos los estados</option>
-                ${Object.entries(statuses).map(([key, label]) => `<option value="${key}">${label}</option>`).join('')}
-              </select></label>
-              ${dateInput('order-date', 'Fecha de recojo', 'data-date-field hidden')}
-              <div class="admin-date-range" data-range-fields hidden>
-                ${dateInput('order-from', 'Desde')}${dateInput('order-to', 'Hasta')}
+            <p class="admin-meta" data-history-note hidden>Registros de días anteriores y pedidos ya cerrados. Puedes acotar el historial con un rango de fechas.</p>
+            <div class="admin-order-filter-panel">
+              <div class="admin-filters admin-order-dates" role="group" aria-label="Fecha de los registros">
+                <label class="admin-field" for="order-period" data-period-field>Consultar<select id="order-period">
+                  <option value="date">Un día</option><option value="range">Un rango</option>
+                </select></label>
+                ${dateInput('order-date', 'Fecha', 'data-date-field')}
+                <div class="admin-date-range" data-range-fields hidden>
+                  ${dateInput('order-from', 'Desde')}${dateInput('order-to', 'Hasta')}
+                </div>
+                <button type="button" class="button button-add" data-order-today>Hoy</button>
               </div>
-              <button type="button" class="text-link link-button" data-clear-filters>Limpiar filtros</button>
+              <div class="admin-filters admin-order-filters" role="group" aria-label="Buscar y filtrar registros">
+                <label class="admin-field" for="order-search">Buscar cliente, código o teléfono<input type="search" id="order-search"></label>
+                <label class="admin-field" for="order-source">Origen<select id="order-source">
+                  <option value="">Todos los orígenes</option>
+                  ${Object.entries(orderSources).map(([key, label]) => `<option value="${key}">${label}</option>`).join('')}
+                </select></label>
+                <label class="admin-field" for="order-status">Estado<select id="order-status">
+                  <option value="">Todos los estados</option>
+                  ${Object.entries(statuses).map(([key, label]) => `<option value="${key}">${label}</option>`).join('')}
+                </select></label>
+                <button type="button" class="text-link link-button" data-clear-filters>Limpiar filtros</button>
+              </div>
             </div>
+            <p class="admin-meta" data-order-date-description hidden></p>
             <div class="admin-list-head">
               <p class="admin-meta" role="status" data-order-count></p>
               <button type="button" class="text-link link-button" data-clear-product hidden></button>
@@ -79,12 +106,12 @@ export function adminPage() {
             <div class="admin-quick-dates" role="group" aria-label="Fechas rápidas de producción">
               <button type="button" class="button button-add" data-production-date="today">Hoy</button>
               <button type="button" class="button button-add" data-production-date="tomorrow">Mañana</button>
-              <button type="button" class="button button-add" data-production-date="next">Próxima fecha con pedidos</button>
+
             </div>
             <div class="admin-metrics admin-metrics-compact" data-production-metrics></div>
             <section class="admin-block" aria-labelledby="production-heading">
               <div class="admin-subhead"><h2 id="production-heading">Unidades por producto</h2>
-                <button type="button" class="text-link link-button" data-open-production-orders>Ver pedidos de esta fecha</button></div>
+                <button type="button" class="text-link link-button" data-open-production-orders>Ver registros de esta fecha</button></div>
               <p class="admin-meta" data-production-key hidden></p>
               <div data-production></div>
             </section>
@@ -128,9 +155,44 @@ export function adminPage() {
           <p class="reservation-error" role="alert" data-state-error hidden></p>
         </form>
         <div class="admin-contact">
+          <button class="button button-add" type="button" data-order-ticket>Descargar ticket PDF</button>
+          <p class="reservation-error" role="alert" data-order-ticket-error hidden></p>
+        </div>
+        <div class="admin-contact" data-order-contact>
           <button class="button button-add" type="button" disabled>WhatsApp</button>
           <p class="admin-meta">El contacto está deshabilitado para los pedidos de demostración.</p>
         </div>
+      </dialog>
+      <dialog class="admin-dialog" id="register-dialog" aria-labelledby="register-title">
+        <div class="admin-dialog-head">
+          <h2 id="register-title">Registrar pedido o venta</h2>
+          <form method="dialog"><button class="button button-add" type="submit">Cerrar</button></form>
+        </div>
+        <form data-order-entry>
+          <label class="admin-field order-entry-type">Tipo de registro
+            <select name="source"><option value="whatsapp">Reserva por WhatsApp</option><option value="counter">Venta de mostrador</option></select>
+          </label>
+          <div class="admin-editor order-entry-fields">
+            <label class="admin-field" data-entry-customer>Cliente<input name="customerName" maxlength="100" autocomplete="off" required></label>
+            <label class="admin-field" data-entry-phone>WhatsApp (opcional)<input name="phone" type="tel" maxlength="25" inputmode="tel"></label>
+            <label class="admin-field"><span data-entry-date-label>Fecha de recojo</span><input name="pickupDate" type="date" required></label>
+            <label class="admin-field"><span data-entry-time-label>Hora de recojo</span><input name="pickupTime" type="time" required></label>
+          </div>
+          <fieldset class="admin-editor-group order-entry-products"><legend>Productos</legend>
+            <div class="order-entry-add">
+              <label class="admin-field">Producto<select name="product"></select></label>
+              <label class="admin-field">Cantidad<input name="quantity" type="number" min="1" max="${maxQuantity}" value="1" inputmode="numeric"></label>
+              <button class="button button-add" type="button" data-entry-add>Añadir</button>
+            </div>
+            <p class="admin-meta" data-entry-help></p>
+            <div data-entry-items></div>
+            <p class="booking-total"><span>Total</span><strong data-entry-total>Bs 0,00</strong></p>
+          </fieldset>
+          <label class="admin-field">Observaciones (opcional)<textarea name="notes" maxlength="300" rows="2"></textarea></label>
+          <p class="reservation-error" role="alert" data-entry-error hidden></p>
+          <p class="admin-meta" data-entry-note>Se guardará como pendiente en esta demostración.</p>
+          <button class="button button-primary" type="submit" data-entry-submit>Guardar reserva</button>
+        </form>
       </dialog>
       <dialog class="admin-dialog" id="product-dialog" aria-labelledby="product-editor-title">
         <div class="admin-dialog-head"><h2 id="product-editor-title"></h2>
@@ -166,7 +228,7 @@ export function adminPage() {
                   <label><input name="pickupMode" type="radio" value="specific"> Solo algunos días</label>
                 </div>
                 <div class="admin-day-choices" data-day-choices role="group" aria-label="Elige los días de recojo" hidden>
-                  ${Object.entries(pickup.weekdays).filter(([, slots]) => slots.length).map(([day]) => `<label class="admin-day"><input name="days" type="checkbox" value="${day}"> ${dayNames[day]}</label>`).join('')}
+                  ${week.map(day => `<label class="admin-day"><input name="days" type="checkbox" value="${day}"> ${weekdayNames[day]}</label>`).join('')}
                 </div>
                 <small class="admin-meta" data-pickup-label role="status"></small>
               </div>

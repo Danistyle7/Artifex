@@ -1,8 +1,10 @@
 import { categories } from './catalog.mjs';
 import { escapeHtml, imageAddress } from './catalog-view.mjs';
-import { availabilityLabel, boliviaDate, formatBs, formatPickupDate, newDemoId } from './reservation-data.mjs';
+import { availabilityLabel, boliviaDate, formatBs, formatPickupDate, isCounterSale, newDemoId, orderSources } from './reservation-data.mjs';
 import { draftKey, initialCatalog, readDemo, storageKey, updateDemo } from './reservation-store.js';
-import { canMarkUncollected, exampleOrders, filterOrders, isClosedOrder, nearestOrderDate, normalizeSearch, ordersOn, paginate, panesIn, pickupAgenda, production, shiftDate, statuses, summary } from './admin-data.mjs';
+import { canMarkUncollected, deliveryDate, exampleOrders, filterOrders, isClosedOrder, normalizeSearch, ordersOn, paginate, panesIn, pickupAgenda, production, salesOn, shiftDate, sortedOrders, statuses, summary } from './admin-data.mjs';
+import { initOrderEntry } from './order-entry.js';
+import { downloadTicket } from './ticket-pdf.js';
 
 const find = selector => document.querySelector(selector);
 const all = selector => [...document.querySelectorAll(selector)];
@@ -14,6 +16,7 @@ const period = find('#order-period');
 const fromDate = find('#order-from');
 const toDate = find('#order-to');
 const orderStatus = find('#order-status');
+const orderSource = find('#order-source');
 const search = find('#order-search');
 const productSearch = find('#product-search');
 const productCategory = find('#product-category');
@@ -78,9 +81,23 @@ function timingLabel(date, today) {
 
 const describeDate = (date, today) => `${date === today ? 'Hoy · ' : ''}${formatPickupDate(date)}`;
 
+const sourceLabel = order => orderSources[order.source] ?? orderSources.demo;
+
+function orderPreview(orders) {
+  return `<ul class="admin-upcoming">${orders.slice(0, 3).map(order => `<li>
+    <div><strong>${escapeHtml(order.customer.name)}</strong><small>${escapeHtml(order.code)} · ${escapeHtml(order.pickup.slot)} · ${panesIn(order)} u. · ${sourceLabel(order)}</small></div>
+    <div class="admin-upcoming-action">${badge(order.status)}${orderButton(order.id)}</div>
+  </li>`).join('')}</ul>`;
+}
+
 function renderSummary() {
   const today = boliviaDate();
-  const values = summary(ordersOn(state.reservations, selectedDate));
+  const orders = state.reservations;
+  const scheduled = ordersOn(orders, selectedDate);
+  const values = summary(scheduled.filter(order => !isCounterSale(order)));
+  const daily = sortedOrders(orders.filter(order => order.pickup.date === selectedDate ||
+    (order.status === 'entregado' && deliveryDate(order) === selectedDate)));
+  const sales = salesOn(orders, selectedDate);
   find('[data-day-description]').textContent = describeDate(selectedDate, today);
   find('[data-metrics]').innerHTML = metrics([
     ['Reservas', values.orders], ['Por preparar', values.pending], ['Listos para recoger', values.prepared], ['Unidades reservadas', values.quantity],
@@ -90,10 +107,35 @@ function renderSummary() {
     <div><dt>No recogidos</dt><dd>${values.uncollected}</dd></div>
     <div><dt>Cancelados</dt><dd>${values.cancelled}</dd></div>
     <div><dt>Valor de reservas sin cancelar</dt><dd>${formatBs(values.reservedValue)}</dd></div>
-    <div><dt>Valor de pedidos entregados</dt><dd>${formatBs(values.deliveredValue)}</dd></div>
-  </dl><p class="admin-meta">Importes referenciales de los pedidos.</p>`;
+  </dl>`;
 
-  const agenda = pickupAgenda(state.reservations, today).slice(0, 4);
+  find('[data-sales-metrics]').innerHTML = metrics([
+    ['Unidades vendidas', sales.units], ['Reservas entregadas', formatBs(sales.reservationValue)],
+    ['Ventas de mostrador', formatBs(sales.counterValue)], ['Valor total de ventas', formatBs(sales.value)],
+  ]);
+  const soldProducts = find('[data-sold-products]');
+  soldProducts.hidden = !sales.products.length;
+  find('[data-sales-products]').innerHTML = sales.products.length
+    ? table('Productos vendidos', ['Producto', 'Unidades', 'Importe'], sales.products.map(product => [
+      escapeHtml(product.name), product.quantity, formatBs(product.cents / 100),
+    ])) : '';
+
+  const groups = [
+    ['Por atender', daily.filter(order => !isClosedOrder(order.status)), ''],
+    ['Entregados', daily.filter(order => order.status === 'entregado'), 'entregado'],
+    ['No recogidos o cancelados', daily.filter(order => order.status === 'no_recogido' || order.status === 'cancelado'), ''],
+  ];
+  find('[data-day-orders]').disabled = !daily.length;
+  find('[data-daily-orders]').innerHTML = daily.length
+    ? groups.filter(([, records]) => records.length).map(([label, records, status]) => `
+      <section class="daily-orders-group">
+        <div class="admin-subhead"><h3>${label} · ${records.length}</h3>
+          ${records.length > 3 ? `<button class="text-link link-button" type="button" data-view-orders="${selectedDate}" data-related-status="${status}">Ver lista completa</button>` : ''}
+        </div>
+        ${orderPreview(records)}
+      </section>`).join('')
+    : empty('Sin movimientos para esta fecha', 'Consulta otro día o registra un pedido o una venta.');
+  const agenda = pickupAgenda(orders, shiftDate(today, 1)).filter(day => day.date !== selectedDate).slice(0, 4);
   find('[data-agenda]').innerHTML = agenda.length
     ? `<div class="agenda-list">${agenda.map(({ date, orders, panes }) => `<article class="agenda-day">
       <header class="agenda-day-header">
@@ -104,10 +146,7 @@ function renderSummary() {
           <button class="text-link link-button" type="button" data-view-production="${date}">Ver producción</button>
         </div>
       </header>
-      <ul class="admin-upcoming">${orders.slice(0, 3).map(order => `<li>
-        <div><strong>${escapeHtml(order.customer.name)}</strong><small>${escapeHtml(order.code)} · ${escapeHtml(order.pickup.slot)} · ${panesIn(order)} u.</small></div>
-        <div class="admin-upcoming-action">${badge(order.status)}${orderButton(order.id)}</div>
-      </li>`).join('')}</ul>
+      ${orderPreview(orders)}
     </article>`).join('')}</div>`
     : empty('Sin recojos por atender', 'Cuando haya pedidos pendientes o listos para recoger, aparecerán aquí.');
 }
@@ -122,7 +161,7 @@ function orderActions(order) {
       <div>${primary ? orderButton(order.id) : ''}
         <button type="button" class="text-link link-button" data-order-edit="${id}">Cambiar estado</button>
         ${primary && canMarkUncollected(order) ? `<button type="button" class="text-link link-button" data-order-change="${id}" data-target-status="no_recogido">Marcar no recogido</button>` : ''}
-        ${order.status !== 'cancelado' ? `<button type="button" class="text-link link-button admin-danger" data-order-change="${id}" data-target-status="cancelado">Cancelar pedido</button>` : ''}
+        ${order.status !== 'cancelado' ? `<button type="button" class="text-link link-button admin-danger" data-order-change="${id}" data-target-status="cancelado">Cancelar ${isCounterSale(order) ? 'venta' : 'pedido'}</button>` : ''}
       </div>
     </details>
   </div>`;
@@ -133,8 +172,12 @@ function renderOrders() {
   const showRange = history || period.value === 'range';
   find('[data-history-note]').hidden = !history;
   find('[data-period-field]').hidden = history;
-  find('[data-date-field]').hidden = history || period.value !== 'date';
+  find('[data-date-field]').hidden = history || showRange;
   find('[data-range-fields]').hidden = !showRange;
+  find('[data-order-today]').hidden = history;
+  const dateDescription = find('[data-order-date-description]');
+  dateDescription.hidden = history || showRange || !orderDate.value;
+  dateDescription.textContent = orderDate.value ? describeDate(orderDate.value, boliviaDate()) : '';
   for (const button of all('[data-order-view]')) button.setAttribute('aria-pressed', String(button.dataset.orderView === ordersView));
   const productButton = find('[data-clear-product]');
   productButton.hidden = !relatedProduct;
@@ -144,39 +187,40 @@ function renderOrders() {
   const today = boliviaDate();
   const orders = rangeError ? [] : filterOrders(state.reservations, {
     view: ordersView, period: period.value, date: orderDate.value, from: fromDate.value, to: toDate.value,
-    status: orderStatus.value, query: search.value, productId: relatedProduct?.id,
+    status: orderStatus.value, source: orderSource.value, query: search.value, productId: relatedProduct?.id,
   }, today);
   const results = paginate(orders, page);
   page = results.current;
   find('[data-order-count]').textContent = orders.length > results.items.length
-    ? `${results.start + 1}–${results.start + results.items.length} de ${orders.length} pedidos`
-    : `${orders.length} ${orders.length === 1 ? 'pedido' : 'pedidos'}`;
+    ? `${results.start + 1}–${results.start + results.items.length} de ${orders.length} registros`
+    : `${orders.length} ${orders.length === 1 ? 'registro' : 'registros'}`;
   const pagination = find('[data-pagination]');
   pagination.hidden = results.pages < 2;
   find('[data-page-label]').textContent = `Página ${page} de ${results.pages}`;
   find('[data-page-step="-1"]').disabled = page === 1;
   find('[data-page-step="1"]').disabled = page === results.pages;
   find('[data-orders]').innerHTML = results.items.length
-    ? table('Listado de pedidos', ['Pedido', 'Cliente', 'Recojo', 'Estado', 'Acciones'], results.items.map(order => {
+    ? table('Listado de pedidos y ventas', ['Registro', 'Cliente u origen', 'Fecha y hora', 'Estado', 'Acciones'], results.items.map(order => {
       const date = escapeHtml(formatPickupDate(order.pickup.date));
       const timing = timingLabel(order.pickup.date, today);
+      const delivered = order.status === 'entregado' && deliveryDate(order) !== order.pickup.date
+        ? `<small>Entrega: ${escapeHtml(formatPickupDate(deliveryDate(order)))}</small>` : '';
       return [
-        `<strong>${escapeHtml(order.code)}</strong><small>${panesIn(order)} u. · ${formatBs(order.total)}</small>${order.source === 'example' ? '<small>Ejemplo</small>' : ''}`,
-        `<strong>${escapeHtml(order.customer.name)}</strong><small>${escapeHtml(order.customer.phone || 'Sin contacto')}</small>`,
-        `<strong>${date}</strong><small>${escapeHtml(order.pickup.slot)}${timing ? ` · ${timing}` : ''}</small>`,
+        `<strong>${escapeHtml(order.code)}</strong><small>${panesIn(order)} u. · ${formatBs(order.total)}</small>`,
+        `<strong>${escapeHtml(order.customer.name)}</strong><small>${sourceLabel(order)}${order.customer.phone ? ` · ${escapeHtml(order.customer.phone)}` : ''}</small>`,
+        `<strong>${date}</strong><small>${escapeHtml(order.pickup.slot)}${timing ? ` · ${timing}` : ''}</small>${delivered}`,
         badge(order.status), orderActions(order),
       ];
     }))
     : rangeError
       ? empty('Revisa el rango de fechas', 'La fecha inicial debe ser anterior o igual a la final.')
-      : empty('Sin pedidos para estos filtros', 'Cambia el período, el estado o la búsqueda.',
-        !history && period.value === 'today' ? '<button type="button" class="text-link link-button" data-view-week>Ver próximos 7 días</button>' : '');
+      : empty('Sin registros para esta consulta', 'Cambia la fecha o los filtros para buscar otros pedidos y ventas.');
 }
 
 function renderProduction() {
   const today = boliviaDate();
   find('[data-production-description]').textContent = describeDate(selectedDate, today);
-  find('[data-production-date="next"]').disabled = !nearestOrderDate(state.reservations, shiftDate(today, 1));
+
   const plan = production(ordersOn(state.reservations, selectedDate));
   find('[data-production-metrics]').innerHTML = metrics([
     ['Reservas', plan.orders], ['Unidades reservadas', plan.units], ['Pedidos por preparar', plan.toPrepare], ['Pedidos por entregar', plan.toDeliver],
@@ -262,29 +306,26 @@ function navigate(section) {
   else location.hash = section;
 }
 
-function defaultOrderPeriod() {
-  const today = boliviaDate();
-  const reservations = state?.reservations ?? [];
-  return reservations.some(order => order.pickup.date >= today) || !reservations.length ? 'upcoming' : 'all';
-}
-
 function showInitialDates() {
-  period.value = defaultOrderPeriod();
-  setDate(nearestOrderDate(state.reservations, boliviaDate(), true));
+  const today = boliviaDate();
+  period.value = 'date';
+  orderDate.value = today;
+  setDate(today);
 }
 
 function clearOrderFilters() {
-  for (const field of [orderDate, fromDate, toDate, orderStatus, search]) field.value = '';
-  period.value = defaultOrderPeriod();
+  for (const field of [fromDate, toDate, orderStatus, orderSource, search]) field.value = '';
+  period.value = 'date';
+  orderDate.value = selectedDate;
   page = 1;
   relatedProduct = undefined;
 }
 
-function openOrders(date, product) {
-  clearOrderFilters();
+function openOrders(date, product, status = '') {
   ordersView = 'work';
-  period.value = 'date';
+  clearOrderFilters();
   orderDate.value = date;
+  orderStatus.value = status;
   relatedProduct = product;
   navigate('pedidos');
 }
@@ -292,24 +333,34 @@ function openOrders(date, product) {
 function showOrder(order) {
   selectedOrder = order.id;
   find('[data-order-code]').textContent = order.code;
-  find('[data-order-origin]').textContent = order.source === 'example' ? 'Pedido de ejemplo' : 'Reserva de demostración';
+  const sale = isCounterSale(order);
+  find('[data-order-origin]').textContent = sale ? 'Venta de mostrador' : `Reserva · ${sourceLabel(order)}`;
+  find('[data-order-contact]').hidden = sale;
+  showError('[data-order-ticket-error]');
   const statusField = stateForm.elements.status;
-  const waitingForPickup = order.status !== 'no_recogido' && !canMarkUncollected(order);
-  statusField.querySelector('[value="no_recogido"]').disabled = waitingForPickup;
+  const waitingForPickup = !sale && order.status !== 'no_recogido' && !canMarkUncollected(order);
+  for (const option of statusField.options) {
+    const invalidSaleStatus = sale && option.value !== 'entregado' && option.value !== 'cancelado';
+    option.hidden = invalidSaleStatus;
+    option.disabled = invalidSaleStatus || (option.value === 'no_recogido' && waitingForPickup);
+  }
   statusField.value = order.status;
   find('#uncollected-help').hidden = !waitingForPickup;
+  const delivered = !sale && order.status === 'entregado' && deliveryDate(order) !== order.pickup.date
+    ? `<div><dt>Fecha de entrega</dt><dd>${escapeHtml(formatPickupDate(deliveryDate(order)))}</dd></div>` : '';
   find('[data-order-detail]').innerHTML = `
     <dl class="booking-data">
-      <div><dt>Cliente</dt><dd>${escapeHtml(order.customer.name)}</dd></div>
-      <div><dt>Teléfono</dt><dd>${escapeHtml(order.customer.phone || 'Sin contacto')}</dd></div>
-      <div><dt>Recojo</dt><dd>${escapeHtml(formatPickupDate(order.pickup.date))} · ${escapeHtml(order.pickup.slot)}</dd></div>
+      ${sale ? '' : `<div><dt>Cliente</dt><dd>${escapeHtml(order.customer.name)}</dd></div>
+      <div><dt>Teléfono</dt><dd>${escapeHtml(order.customer.phone || 'Sin contacto')}</dd></div>`}
+      <div><dt>${sale ? 'Fecha de venta' : 'Recojo'}</dt><dd>${escapeHtml(formatPickupDate(order.pickup.date))} · ${escapeHtml(order.pickup.slot)}</dd></div>
+      ${delivered}
       <div><dt>Estado actual</dt><dd>${badge(order.status)}</dd></div>
       <div><dt>Observaciones</dt><dd>${escapeHtml(order.notes || 'Sin observaciones')}</dd></div>
     </dl>
-    ${table('Productos reservados', ['Producto', 'Unidades', 'Precio unitario', 'Subtotal'], order.items.map(item => [
+    ${table(sale ? 'Productos vendidos' : 'Productos reservados', ['Producto', 'Unidades', 'Precio unitario', 'Subtotal'], order.items.map(item => [
       escapeHtml(item.name), item.quantity, formatBs(item.unitPrice), formatBs(item.subtotal),
     ]))}
-    <p class="booking-total"><span>Total al reservar</span><strong>${formatBs(order.total)}</strong></p>`;
+    <p class="booking-total"><span>${sale ? 'Total de la venta' : 'Total al reservar'}</span><strong>${formatBs(order.total)}</strong></p>`;
 }
 
 function chosenDays() {
@@ -380,13 +431,16 @@ function confirmAction(action, title, description, label) {
 function proposeOrder(id, target, control) {
   const order = state?.reservations.find(item => item.id === id);
   if (!order || !Object.hasOwn(statuses, target)) return;
+  if (isCounterSale(order) && target !== 'entregado' && target !== 'cancelado') return;
   if (order.status === target) {
     find('[data-state-message]').textContent = 'El pedido ya tiene este estado.';
     return;
   }
   const action = { type: 'order', id, previous: order.status, target, control };
   if (target === 'cancelado') {
-    confirmAction(action, '¿Cancelar pedido?', `${order.code} quedará en el historial y sus unidades dejarán de contar en producción.`, 'Confirmar cancelación');
+    const subject = isCounterSale(order) ? 'venta' : 'pedido';
+    const report = isCounterSale(order) ? 'el total de ventas' : 'producción';
+    confirmAction(action, `¿Cancelar ${subject}?`, `${order.code} quedará en el historial y sus unidades dejarán de contar en ${report}.`, 'Confirmar cancelación');
   } else if (target === 'no_recogido') {
     if (!canMarkUncollected(order)) {
       showError(orderDialog.open ? '[data-state-error]' : '[data-error]', 'La hora de recojo aún no ha terminado.');
@@ -426,6 +480,11 @@ async function applyAction({ type, id, previous, target, control }) {
       if (type === 'order') {
         const order = data.reservations.find(item => item.id === id);
         if (!order || order.status !== previous || (target === 'no_recogido' && !canMarkUncollected(order))) return null;
+        if (target === 'entregado') {
+          order.deliveredOn = isCounterSale(order) ? order.pickup.date : order.deliveredOn ?? boliviaDate();
+        } else if (target === 'pendiente' || target === 'preparado') {
+          delete order.deliveredOn;
+        }
         order.status = target;
         order.updatedAt = new Date().toISOString();
         return order;
@@ -469,7 +528,7 @@ document.addEventListener('click', event => {
   const fields = button.dataset;
   if (fields.viewOrders) {
     const product = fields.relatedId ? { id: fields.relatedId, name: fields.relatedName } : undefined;
-    openOrders(fields.viewOrders, product);
+    openOrders(fields.viewOrders, product, fields.relatedStatus);
   } else if (fields.viewProduction) {
     setDate(fields.viewProduction);
     navigate('produccion');
@@ -528,13 +587,29 @@ stateForm.addEventListener('submit', event => {
 });
 
 for (const field of [summaryDate, productionDate]) field.addEventListener('change', () => setDate(field.value));
-for (const field of [period, orderDate, fromDate, toDate, orderStatus, search]) field.addEventListener('input', () => {
+for (const field of [orderDate, fromDate, toDate, orderSource, orderStatus, search]) field.addEventListener('input', () => {
   page = 1;
   render();
 });
+period.addEventListener('change', () => {
+  if (period.value === 'range') fromDate.value = toDate.value = orderDate.value || selectedDate;
+  page = 1;
+  render();
+});
+find('[data-order-today]').addEventListener('click', () => {
+  period.value = 'date';
+  orderDate.value = boliviaDate();
+  page = 1;
+  render();
+  orderDate.focus();
+});
+find('[data-day-orders]').addEventListener('click', () => openOrders(selectedDate));
 for (const field of [productSearch, productCategory, productStatus]) field.addEventListener('input', render);
 for (const button of all('[data-order-view]')) button.addEventListener('click', () => {
+  if (ordersView === button.dataset.orderView) return;
   ordersView = button.dataset.orderView;
+  fromDate.value = toDate.value = '';
+  period.value = 'date';
   relatedProduct = undefined;
   page = 1;
   render();
@@ -555,19 +630,9 @@ find('[data-clear-product]').addEventListener('click', () => {
   page = 1;
   render();
 });
-find('[data-orders]').addEventListener('click', event => {
-  if (!event.target.closest('[data-view-week]')) return;
-  period.value = 'week';
-  page = 1;
-  render();
-  period.focus();
-});
-
 for (const button of all('[data-production-date]')) button.addEventListener('click', () => {
   const today = boliviaDate();
-  const mode = button.dataset.productionDate;
-  const date = mode === 'today' ? today : mode === 'tomorrow' ? shiftDate(today, 1) : nearestOrderDate(state.reservations, shiftDate(today, 1));
-  if (date) setDate(date);
+  setDate(button.dataset.productionDate === 'today' ? today : shiftDate(today, 1));
 });
 find('[data-open-production-orders]').addEventListener('click', () => openOrders(selectedDate));
 window.addEventListener('hashchange', () => {
@@ -585,6 +650,25 @@ window.addEventListener('storage', event => {
   else if (order.status !== priorStatus) showOrder(order);
 });
 
+const entry = initOrderEntry(order => {
+  refresh();
+  openOrders(order.pickup.date);
+  message(`${isCounterSale(order) ? 'Venta registrada' : 'Reserva registrada'} · ${order.code}`);
+});
+find('[data-register-order]').addEventListener('click', () => {
+  const date = ordersView === 'work' && period.value === 'date' ? orderDate.value : boliviaDate();
+  if (!entry.open(date)) showError('[data-error]', 'Habilita el almacenamiento local para guardar el registro.');
+});
+find('[data-order-ticket]').addEventListener('click', () => {
+  const order = state?.reservations.find(item => item.id === selectedOrder);
+  if (!order) return;
+  showError('[data-order-ticket-error]');
+  try {
+    downloadTicket(order);
+  } catch {
+    showError('[data-order-ticket-error]', 'No se pudo descargar el ticket. Vuelve a intentarlo.');
+  }
+});
 find('[data-close-product]').addEventListener('click', () => productDialog.close());
 for (const input of all('[data-product-form] [name="pickupMode"], [data-product-form] [name="days"]')) {
   input.addEventListener('change', syncDays);

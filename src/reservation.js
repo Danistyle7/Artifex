@@ -1,7 +1,8 @@
 import { cartChange } from './cart.js';
-import { availabilityLabel, bolivianMobile, formatBs, formatPickupDate, maxQuantity, newDemoId, pickupDates, unavailableItems } from './reservation-data.mjs';
-import { cartItems, cartTotal, draftKey, readDemo, updateDemo } from './reservation-store.js';
+import { availabilityLabel, bolivianMobile, formatBs, formatPickupDate, maxQuantity, pickupDates, unavailableItems } from './reservation-data.mjs';
+import { cartItems, cartTotal, createReservation, draftKey, readDemo, updateDemo } from './reservation-store.js';
 import { escapeHtml } from './catalog-view.mjs';
+import { downloadTicket } from './ticket-pdf.js';
 
 function confirmationUrl(reservation) {
   const url = new URL('../reserva/', import.meta.url);
@@ -118,7 +119,7 @@ function checkout(container) {
       const state = readDemo();
       items = cartItems(state.cart, state.catalog);
       displayedCart = JSON.stringify(items);
-      const last = state.reservations.findLast(reservation => reservation?.id && reservation.source !== 'example');
+      const last = state.reservations.findLast(reservation => reservation?.id && (!reservation.source || reservation.source === 'demo'));
       lastReservation.hidden = !last?.id;
       if (last?.id) lastReservation.href = confirmationUrl(last).href;
     } catch {
@@ -239,28 +240,12 @@ function checkout(container) {
           throw new CheckoutError('La fecha o la hora ya no está disponible para tu selección. Elige otra opción.');
         }
 
-        let id;
-        let code;
-        do {
-          id = newDemoId();
-          code = `ART-${id.slice(0, 8).toUpperCase()}`;
-        } while (state.reservations.some(booking => booking?.code === code));
-        const booking = {
-          id,
-          code,
+        const booking = createReservation(state, {
           customer: { name, phone },
-          items: current.map(({ product, quantity, subtotal }) => ({
-            productId: product.slug, name: product.name, quantity, unitPrice: product.price, subtotal,
-          })),
-          currency: 'BOB',
-          total: cartTotal(current),
+          items: current,
           pickup: { date: currentDate.date, slot: selectedSlot },
           notes,
-          createdAt: new Date().toISOString(),
-          status: 'pendiente',
-          source: 'demo',
-        };
-        state.reservations.push(booking);
+        });
         state.cart = {};
         return booking;
       });
@@ -321,7 +306,15 @@ function confirmation(container) {
     return row;
   }));
   document.title = `Constancia Artifex ${booking.code}`;
-  find('[data-print-receipt]').addEventListener('click', () => window.print());
+  find('[data-download-ticket]').addEventListener('click', () => {
+    const error = find('[data-ticket-error]');
+    error.hidden = true;
+    try {
+      downloadTicket(booking);
+    } catch {
+      error.hidden = false;
+    }
+  });
   find('[data-booking]').hidden = false;
   if (window.location.hash === '#resumen') document.querySelector('#resumen').scrollIntoView();
 }

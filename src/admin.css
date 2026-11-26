@@ -98,7 +98,12 @@
 .admin-order-tabs .button, .admin-quick-dates .button, .admin-pagination .button { margin: 0; }
 .admin-order-tabs [aria-pressed="true"] { background: var(--green); color: var(--cream); border-color: var(--green); }
 .admin-order-tabs [aria-pressed="true"]:not(:disabled):hover { background: #285142; }
+.admin-order-filter-panel { padding: .8rem .9rem; border: 1px solid var(--line); background: #f5efe2; }
+.admin-order-filter-panel .admin-filters:last-child { margin-bottom: 0; }
+.admin-order-dates { padding-bottom: .75rem; border-bottom: 1px solid var(--line); }
+.admin-order-dates .button { min-height: 2.75rem; margin: 0; }
 .admin-order-filters .admin-field:first-child { flex: 1 1 14rem; }
+.admin-order-filters .link-button { min-height: 2.75rem; }
 .admin-date-range { display: flex; flex-wrap: wrap; gap: .55rem .65rem; }
 .admin-list-head, .admin-row-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .15rem .75rem; }
 .admin-list-head [data-clear-product] { color: var(--clay); font-size: .86rem; }
@@ -119,11 +124,6 @@
 @media (max-width: 51.999rem) {
   .admin-table td > .admin-cell { min-width: 0; justify-self: stretch; }
   .admin-order-menu > div { position: static; min-width: 0; }
-}
-@media (min-width: 36rem) {
-}
-@media (min-width: 62rem) {
-  .admin-metrics-status { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 }
 
 .admin-metrics-status { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -155,6 +155,33 @@
   .admin-metrics-status, .admin-summary-details { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 [data-production-key] { margin: 0 0 .75rem; }
-@media (min-width: 64rem) {
-  .admin-summary-details { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.admin-day-choices label { text-transform: capitalize; }
+
+.daily-orders-group { border: 1px solid var(--line); margin-bottom: .65rem; }
+.daily-orders-group .admin-subhead { padding: .5rem .75rem; margin: 0; background: var(--paper); }
+.daily-orders-group h3 { font-size: 1.3rem; }
+.daily-orders-group .admin-upcoming { padding-inline: .75rem; }
+.daily-orders-group li:last-child { border-bottom: 0; }
+.admin-sold-products { margin-top: .65rem; }
+.admin-sold-products summary { width: fit-content; padding-block: .4rem; color: var(--green); font-weight: 650; cursor: pointer; }
+
+.order-entry-type { max-width: 22rem; margin-bottom: .75rem; }
+.order-entry-products { margin-block: .9rem; }
+.order-entry-add { display: grid; grid-template-columns: minmax(0, 1fr) 5.2rem auto; align-items: end; gap: .5rem; }
+.order-entry-add .button { min-height: 2.75rem; margin: 0; }
+.order-entry-list { list-style: none; margin: 0; padding: 0; }
+.order-entry-list li { display: grid; grid-template-columns: minmax(0, 1fr) 4rem max-content max-content; align-items: center; gap: .35rem .65rem; padding: .5rem 0; border-top: 1px solid var(--line); }
+.order-entry-list small { display: block; color: var(--muted); }
+.order-entry-list strong { overflow-wrap: anywhere; }
+.order-entry-list input { width: 100%; min-height: 2.75rem; padding: .35rem; border: 1px solid #a8a18e; border-radius: .2rem; background: #fffbf3; color: var(--ink); font: inherit; }
+.order-entry-list .link-button { min-height: 2.75rem; }
+.order-entry-products .booking-total { padding-bottom: 0; }
+.order-entry-products [data-entry-help]:empty { display: none; }
+@media (max-width: 36rem) {
+  .order-entry-add { grid-template-columns: minmax(0, 1fr) 5rem; }
+  .order-entry-add .button { grid-column: 1 / -1; justify-self: start; }
+  .order-entry-list li { grid-template-columns: minmax(0, 1fr) max-content max-content; }
+  .order-entry-list li > div { grid-column: 1 / -1; }
+  .order-entry-list input { max-width: 4rem; }
+  .admin-date-range { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
